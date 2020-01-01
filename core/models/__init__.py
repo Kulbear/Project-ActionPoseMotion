@@ -5,9 +5,8 @@ from .pose_motion_model import (
 )
 
 from .refinement_model import (
-    RefineNetV1,
-    RefineNetV2,
-    RefineNetV3,
-    RefineNetV4,
-    RefineConvNet
+    TrajRefinementModule,
+    ResTrajRefinementModule,
+    ResConvTrajRefinementModule,
+    EnsTrajRefinementModule
 )
