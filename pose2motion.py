@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from core.log import Logger, save_fig, save_config
 from core.data.generators import PoseGenerator
-from core.models import PoseLifter, MotionGenerator, Pose2MotNet, RefineNetV1, RefineNetV2, RefineNetV3, RefineNetV4
+from core.models import PoseLifter, MotionGenerator, Pose2MotNet, TrajRefinementModule, ResTrajRefinementModule
 from core.utils import save_ckpt
 from core.data.data_utils import fetch, read_3d_data, create_2d_data
 
@@ -21,8 +21,8 @@ def main(config):
 
     # workaround for motion evaluation calculation
     # window_stride = config.future - config.past
-    assert config.past <= config.future, \
-        'The current evaluation scheme for motion prediction requires config.past <= config.future'
+    # assert config.past <= config.future, \
+    #     'The current evaluation scheme for motion prediction requires config.past <= config.future'
 
     evaluate_motion = config.final and config.past != config.future
     if evaluate_motion:
@@ -101,13 +101,9 @@ def main(config):
     pos2mot_model = Pose2MotNet(encoder, decoder).to(device)
 
     if config.refine_version == 1:
-        RefineNet = RefineNetV1
+        RefineNet = TrajRefinementModule
     elif config.refine_version == 2:
-        RefineNet = RefineNetV2
-    elif config.refine_version == 3:
-        RefineNet = RefineNetV3
-    elif config.refine_version == 4:
-        RefineNet = RefineNetV4
+        RefineNet = ResTrajRefinementModule
 
     refine_model = RefineNet(config.decoder_opt_dim, config.decoder_opt_dim,
                              hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
