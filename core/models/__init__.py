@@ -10,3 +10,10 @@ from .refinement_model import (
     ResConvTrajRefinementModule,
     EnsTrajRefinementModule
 )
+
+REFINEMENT_ARCHS = {
+    1: TrajRefinementModule,
+    2: ResTrajRefinementModule,
+    3: ResConvTrajRefinementModule,
+    4: EnsTrajRefinementModule
+}

@@ -7,7 +7,10 @@ from torch.utils.data import DataLoader
 
 from core.log import Logger, save_fig, save_config
 from core.data.generators import PoseGenerator
-from core.models import PoseLifter, MotionGenerator, Pose2MotNet, TrajRefinementModule, ResTrajRefinementModule
+from core.models import (
+    PoseLifter, MotionGenerator, Pose2MotNet,
+    REFINEMENT_ARCHS
+)
 from core.utils import save_ckpt
 from core.data.data_utils import fetch, read_3d_data, create_2d_data
 
@@ -100,14 +103,14 @@ def main(config):
                               bidirectional=config.bidirectional, dropout_ratio=config.dropout)
     pos2mot_model = Pose2MotNet(encoder, decoder).to(device)
 
-    if config.refine_version == 1:
-        RefineNet = TrajRefinementModule
-    elif config.refine_version == 2:
-        RefineNet = ResTrajRefinementModule
+    RefineNet = REFINEMENT_ARCHS.get(config.refine_version, None)
+    if not RefineNet:
+        raise NotImplementedError('Unknown refinement architecture!')
 
     refine_model = RefineNet(config.decoder_opt_dim, config.decoder_opt_dim,
                              hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
-                             bidirectional=config.bidirectional, dropout_ratio=config.dropout).to(device)
+                             bidirectional=config.bidirectional, dropout_ratio=config.dropout,
+                             size=(config.batch_size, config.past + config.future, 45)).to(device)
     criterion = nn.MSELoss().to(device)
     if refine_model is not None:
         optimizer = torch.optim.Adam(list(pos2mot_model.parameters()) + list(refine_model.parameters()), lr=config.lr)
