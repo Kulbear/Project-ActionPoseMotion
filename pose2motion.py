@@ -19,13 +19,20 @@ def main(config):
     device = config.device
     print('==> Using settings {}'.format(config))
 
+    # workaround for motion evaluation calculation
+    # window_stride = config.future - config.past
+    assert config.past <= config.future, \
+        'The current evaluation scheme for motion prediction requires config.past <= config.future'
+
+    evaluate_motion = config.final and config.past != config.future
+    if evaluate_motion:
+        print('==> Final evaluation!')
     ckpt_dir_path = Path('experiments', config.exp_name)
     print('==> Created checkpoint dir: {}'.format(ckpt_dir_path))
     if ckpt_dir_path.exists():
         print('==> Found existing checkpoint dir!')
     ckpt_dir_path.mkdir(parents=True, exist_ok=True)
 
-    save_config(config, Path(ckpt_dir_path, 'config.json'))
     logger = Logger(Path(ckpt_dir_path, 'log.txt'))
     logger.set_names(['epoch', 'iter', 'lr', 'loss_train',
                       'Pose MPJPE', 'Pose P-MPJPE', 'Motion MPJPE', 'Motion P-MPJPE'])
@@ -66,13 +73,24 @@ def main(config):
                  window_stride=config.window_stride, time_stride=config.time_stride)
     train_loader = DataLoader(PoseGenerator(*data),
                               batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-
+    # pose evaluation
     data = fetch(subjects_test, dataset, keypoints,
                  past=config.past, future=config.future, action_filter=action_filter,
                  window_stride=None, time_stride=config.time_stride)
-    valid_loader = DataLoader(PoseGenerator(*data),
-                              batch_size=config.batch_size * 4, shuffle=False, num_workers=config.num_workers)
+    valid_loader_pose = DataLoader(PoseGenerator(*data),
+                                   batch_size=config.batch_size * 4, shuffle=False, num_workers=config.num_workers)
+
+    if evaluate_motion:
+        data = fetch(subjects_test, dataset, keypoints,
+                     past=config.past, future=config.future, action_filter=action_filter,
+                     window_stride=config.future - config.past, time_stride=config.time_stride)
+        valid_loader_motion = DataLoader(PoseGenerator(*data),
+                                         batch_size=config.batch_size * 4,
+                                         shuffle=False, num_workers=config.num_workers)
     print('Done!')
+
+    # save experiment config
+    save_config(config, Path(ckpt_dir_path, 'config.json'))
 
     encoder = Encoder(config.encoder_ipt_dim, config.encoder_opt_dim,
                       hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
@@ -85,12 +103,10 @@ def main(config):
     criterion = nn.MSELoss().to(device)
     optimizer = torch.optim.Adam(model_pos.parameters(), lr=config.lr)
 
-    start_epoch = 0
     error_best_pose = None
     error_best_motion = None
     glob_step = 0
     lr_now = config.lr
-
 
     for epoch in range(config.start_epoch, config.epochs):
         print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr_now))
@@ -102,7 +118,12 @@ def main(config):
 
         # Evaluate
         # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
-        errors = evaluate(valid_loader, model_pos, device)
+        errors = evaluate(valid_loader_pose, model_pos, device)
+        if evaluate_motion:
+            errors = list(errors)
+            errors_motion = evaluate(valid_loader_motion, model_pos, device)
+            for i in range(2, len(errors)):
+                errors[i] = errors_motion[i]
 
         # Update log file
         logger.append([epoch + 1, glob_step, lr_now, epoch_loss, *errors])
