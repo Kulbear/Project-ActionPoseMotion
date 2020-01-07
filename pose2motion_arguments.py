@@ -6,6 +6,8 @@ def parse_args():
 
     parser.add_argument('--exp_name', required=True, type=str,
                         help='The name of the experiment.')
+    parser.add_argument('--final', default=False, type=bool,
+                        help='Whether do the final result evaluation (accurate pose and motion)')
 
     parser.add_argument('--dataset', default='h36m', type=str,
                         help='Target experiment dataset.')
