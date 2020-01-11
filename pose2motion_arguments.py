@@ -62,8 +62,30 @@ def parse_args():
                         help='The rate of learning rate decay.')
     parser.add_argument('--start_epoch', default=0, type=int,
                         help='Starting epoch number.')
-    parser.add_argument('--epochs', default=60, type=int,
+    parser.add_argument('--epochs', default=36, type=int,
                         help='The number of training epochs.')
+
+    # visualization
+    parser.add_argument('--viz_subject', default='S1', type=str,
+                        help='The subject used in visualization.')
+    parser.add_argument('--viz_camera', default=0, type=int,
+                        help='The camera used in visualization.')
+    parser.add_argument('--viz_action', default='Walking 1', type=str,
+                        help='The action used in visualization.')
+    parser.add_argument('--viz_video', type=str, default=None,
+                        help='path to input video')
+    parser.add_argument('--viz_skip', type=int, default=0,
+                        help='skip first N frames of input video')
+    parser.add_argument('--viz_output', type=str, default='visualization.gif',
+                        help='output file name (.gif or .mp4)')
+    parser.add_argument('--viz_bitrate', type=int, default=3000,
+                        help='bitrate for mp4 videos')
+    parser.add_argument('--viz_limit', type=int, default=-1,
+                        help='only render first N frames')
+    parser.add_argument('--viz_downsample', type=int, default=1,
+                        help='downsample FPS by a factor N')
+    parser.add_argument('--viz_size', type=int, default=5,
+                        help='image size')
 
     args = parser.parse_args()
     return args
