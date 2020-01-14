@@ -75,16 +75,14 @@ def fetch_inference(subject, dataset, keypoints,
     pose_3d_past_segments = []
     pose_3d_future_segments = []
     pose_actions = []
-
     for cam_idx in range(len(out_poses_2d)):
-        for i in range(past, len(out_poses_2d[cam_idx]) - future, window_stride):
-            if i == camera_idx:
+        if cam_idx == camera_idx:
+            for i in range(past, len(out_poses_2d[cam_idx]) - future, window_stride):
                 pose_2d_past_segments.append(out_poses_2d[cam_idx][i - past:i])
                 pose_actions.append(out_actions[cam_idx][i])
                 if out_poses_3d is not None:
                     pose_3d_past_segments.append(out_poses_3d[cam_idx][i - past:i])
                     pose_3d_future_segments.append(out_poses_3d[cam_idx][i:i + future])
-
     return pose_2d_past_segments, pose_3d_past_segments, pose_3d_future_segments, pose_actions
 
 

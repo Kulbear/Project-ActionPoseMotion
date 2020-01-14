@@ -4,6 +4,8 @@ matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
+# the following import must be kept for the availabilty of 3d project in matplotlib
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import subprocess as sp
 
