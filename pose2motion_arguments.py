@@ -65,9 +65,15 @@ def parse_args():
     parser.add_argument('--epochs', default=36, type=int,
                         help='The number of training epochs.')
 
+    # evaluation
+    parser.add_argument('--ckpt_path', default=None, type=str,
+                        help='The path to the trained model.')
+
     # visualization
     parser.add_argument('--viz_subject', default='S1', type=str,
                         help='The subject used in visualization.')
+    parser.add_argument('--viz_target', default='past', type=str,
+                        help='The visualization target, can be one of "past" or "future".')
     parser.add_argument('--viz_camera', default=0, type=int,
                         help='The camera used in visualization.')
     parser.add_argument('--viz_action', default='Walking 1', type=str,

@@ -72,11 +72,15 @@ def evaluate(data_loader, model_pos, device, inference_mode=False):
     mpjpe_pose = AverageMeter()
     mpjpe_pose_raligned = AverageMeter()
     mpjpe_motion = AverageMeter()
+    mpjpe_motion = AverageMeter()
     mpjpe_motion_raligned = AverageMeter()
 
     if inference_mode:
+        keypoint_sequence = []
         pose_sequence = []
         motion_sequence = []
+        pose_sequence_gt = []
+        motion_sequence_gt = []
 
     # Switch to evaluate mode
     torch.set_grad_enabled(False)
@@ -94,6 +98,9 @@ def evaluate(data_loader, model_pos, device, inference_mode=False):
         batch, seq_len = pose_2d.size()[:2]
         _, future_seq_len = motion_gt.size()[:2]
 
+        if inference_mode:
+            keypoint_sequence.append(pose_2d.numpy())
+
         pose_2d = pose_2d.to(device).view(batch, seq_len, -1)
         pred = model_pos(pose_2d, motion_gt[:, :, 1:, :].view(batch, future_seq_len, -1).to(device),
                          teacher_forcing_ratio=0.)
@@ -105,8 +112,10 @@ def evaluate(data_loader, model_pos, device, inference_mode=False):
         pred_pose_3d = torch.cat([torch.zeros(batch * seq_len, 1, pred_pose_3d.size(2)), pred_pose_3d], 1)
         pred_motion_3d = torch.cat([torch.zeros(batch * future_seq_len, 1, pred_motion_3d.size(2)), pred_motion_3d], 1)
         if inference_mode:
-            pose_sequence.append(pred_pose_3d)
-            motion_sequence.append(pred_motion_3d)
+            pose_sequence.append(pred_pose_3d.cpu().numpy())
+            motion_sequence.append(pred_motion_3d.cpu().numpy())
+            pose_sequence_gt.append(pose_3d.cpu().numpy())
+            motion_sequence_gt.append(motion_gt.cpu().numpy())
 
         mpjpe_pose.update(mpjpe(pred_pose_3d, pose_3d).item() * 1000.0, batch * seq_len)
         mpjpe_pose_raligned.update(p_mpjpe(pred_pose_3d.numpy(), pose_3d.numpy()).item() * 1000.0,
@@ -127,6 +136,7 @@ def evaluate(data_loader, model_pos, device, inference_mode=False):
 
     bar.finish()
     if inference_mode:
-        return np.vstack(np.array(pose_sequence), axis=1), np.vstack(np.array(motion_sequence), axis=1)
+        return np.vstack(np.array(pose_sequence)), np.vstack(pose_sequence_gt), \
+               np.vstack(np.array(motion_sequence)), np.vstack(motion_sequence_gt), np.vstack(keypoint_sequence)
     else:
         return mpjpe_pose.avg, mpjpe_pose_raligned.avg, mpjpe_motion.avg, mpjpe_motion_raligned.avg
