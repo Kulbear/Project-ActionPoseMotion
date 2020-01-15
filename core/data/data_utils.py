@@ -32,6 +32,60 @@ def read_3d_data(dataset):
     return dataset
 
 
+def fetch_inference(subject, dataset, keypoints,
+                    past=8, future=16, window_stride=None,
+                    action='Walking 1', camera_idx=0, time_stride=1, parse_3d_poses=True):
+    # If not specified, use past size as the sliding window strides
+    if window_stride is None:
+        window_stride = past
+
+    out_poses_3d = []
+    out_poses_2d = []
+    out_actions = []
+    # Example: subject => S1, action => Walking 1
+    print('==> Fetching subject:', subject)
+    print('==> Fetching action:', action)
+    action_type = action.split(' ')[0]
+    poses_2d = keypoints[subject][action]
+    for i in range(len(poses_2d)):  # Iterate across cameras
+        if i == camera_idx:
+            out_poses_2d.append(poses_2d[i])
+            out_actions.append([action_type] * poses_2d[i].shape[0])
+
+    if parse_3d_poses and 'positions_3d' in dataset[subject][action]:
+        poses_3d = dataset[subject][action]['positions_3d']
+        assert len(poses_3d) == len(poses_2d), 'Camera count mismatch'
+        for i in range(len(poses_3d)):  # Iterate across cameras
+            if i == camera_idx:
+                out_poses_3d.append(poses_3d[i])
+
+    if len(out_poses_3d) == 0:
+        out_poses_3d = None
+
+    if time_stride > 1:
+        # Downsample as requested
+        for i in range(len(out_poses_2d)):
+            out_poses_2d[i] = out_poses_2d[i][::time_stride]
+            out_actions[i] = out_actions[i][::time_stride]
+            if out_poses_3d is not None:
+                out_poses_3d[i] = out_poses_3d[i][::time_stride]
+
+    # out_poses_3d, out_poses_2d, out_actions
+    pose_2d_past_segments = []
+    pose_3d_past_segments = []
+    pose_3d_future_segments = []
+    pose_actions = []
+    for cam_idx in range(len(out_poses_2d)):
+        if cam_idx == camera_idx:
+            for i in range(past, len(out_poses_2d[cam_idx]) - future, window_stride):
+                pose_2d_past_segments.append(out_poses_2d[cam_idx][i - past:i])
+                pose_actions.append(out_actions[cam_idx][i])
+                if out_poses_3d is not None:
+                    pose_3d_past_segments.append(out_poses_3d[cam_idx][i - past:i])
+                    pose_3d_future_segments.append(out_poses_3d[cam_idx][i:i + future])
+    return pose_2d_past_segments, pose_3d_past_segments, pose_3d_future_segments, pose_actions
+
+
 def fetch(subjects, dataset, keypoints,
           past=8, future=16, window_stride=None,
           action_filter=None, time_stride=1, parse_3d_poses=True):
