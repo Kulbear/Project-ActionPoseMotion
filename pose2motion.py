@@ -26,7 +26,7 @@ def main(config):
 
     evaluate_motion = config.final and config.past != config.future
     if evaluate_motion:
-        print('==> Final evaluation!')
+        print('==> Evaluate motion!')
     ckpt_dir_path = Path('experiments', config.exp_name)
     print('==> Created checkpoint dir: {}'.format(ckpt_dir_path))
     if ckpt_dir_path.exists():
@@ -76,14 +76,14 @@ def main(config):
     # pose evaluation
     data = fetch(subjects_test, dataset, keypoints,
                  past=config.past, future=config.future, action_filter=action_filter,
-                 window_stride=None, time_stride=config.time_stride)
+                 window_stride=config.past, time_stride=config.time_stride)
     valid_loader_pose = DataLoader(PoseGenerator(*data),
                                    batch_size=config.batch_size * 4, shuffle=False, num_workers=config.num_workers)
 
     if evaluate_motion:
         data = fetch(subjects_test, dataset, keypoints,
                      past=config.past, future=config.future, action_filter=action_filter,
-                     window_stride=config.future - config.past, time_stride=config.time_stride)
+                     window_stride=config.future, time_stride=config.time_stride)
         valid_loader_motion = DataLoader(PoseGenerator(*data),
                                          batch_size=config.batch_size * 4,
                                          shuffle=False, num_workers=config.num_workers)
@@ -121,7 +121,7 @@ def main(config):
         errors = evaluate(valid_loader_pose, model_pos, device)
         if evaluate_motion:
             errors = list(errors)
-            errors_motion = evaluate(valid_loader_motion, model_pos, device)
+            errors_motion = evaluate(valid_loader_motion, model_pos, device, inference_mode=False)
             for i in range(2, len(errors)):
                 errors[i] = errors_motion[i]
 
