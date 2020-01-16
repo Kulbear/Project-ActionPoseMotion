@@ -71,13 +71,13 @@ def main(config):
     data = fetch(subjects_train, dataset, keypoints,
                  past=config.past, future=config.future, action_filter=action_filter,
                  window_stride=config.window_stride, time_stride=config.time_stride)
-    train_loader = DataLoader(PoseGenerator(*data),
+    train_loader = DataLoader(PoseGenerator(*data, dataset_name=config.dataset),
                               batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
     # pose evaluation
     data = fetch(subjects_test, dataset, keypoints,
                  past=config.past, future=config.future, action_filter=action_filter,
                  window_stride=None, time_stride=config.time_stride)
-    valid_loader_pose = DataLoader(PoseGenerator(*data),
+    valid_loader_pose = DataLoader(PoseGenerator(*data, dataset_name=config.dataset),
                                    batch_size=config.batch_size * 4, shuffle=False, num_workers=config.num_workers)
 
     if evaluate_motion:
