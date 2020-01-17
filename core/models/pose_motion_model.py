@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 
 
-class Encoder(nn.Module):
+class PoseLifter(nn.Module):
     def __init__(self, ipt_dim, opt_dim, hid_dim=128, n_layers=1, bidirectional=False, dropout_ratio=0.5):
-        super(Encoder, self).__init__()
+        super(PoseLifter, self).__init__()
         # config
         self.ipt_dim = ipt_dim
         self.hid_dim = hid_dim
@@ -28,9 +28,9 @@ class Encoder(nn.Module):
         return {'pose_3d': out, 'encoder_hidden': hidden}
 
 
-class Decoder(nn.Module):
+class MotionGenerator(nn.Module):
     def __init__(self, ipt_dim, opt_dim, hid_dim=128, n_layers=1, bidirectional=True, dropout_ratio=0.5):
-        super(Decoder, self).__init__()
+        super(MotionGenerator, self).__init__()
         # config
         self.ipt_dim = ipt_dim
         self.hid_dim = hid_dim
@@ -61,9 +61,9 @@ class Decoder(nn.Module):
         return {'motion_3d': x, 'decoder_hidden': hidden}
 
 
-class Seq2Seq(nn.Module):
+class Pose2MotNet(nn.Module):
     def __init__(self, encoder, decoder, device='cuda'):
-        super(Seq2Seq, self).__init__()
+        super(Pose2MotNet, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
         self.device = device

@@ -1,5 +1,7 @@
 from .pose_motion_model import (
-    Encoder,
-    Decoder,
-    Seq2Seq
+    PoseLifter,
+    MotionGenerator,
+    Pose2MotNet
 )
+
+from .refinement_model import RefineNetV1, RefineNetV2
