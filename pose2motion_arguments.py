@@ -62,7 +62,7 @@ def parse_args():
                         help='The rate of learning rate decay.')
     parser.add_argument('--start_epoch', default=0, type=int,
                         help='Starting epoch number.')
-    parser.add_argument('--epochs', default=36, type=int,
+    parser.add_argument('--epochs', default=30, type=int,
                         help='The number of training epochs.')
 
     # evaluation
@@ -92,6 +92,11 @@ def parse_args():
                         help='downsample FPS by a factor N')
     parser.add_argument('--viz_size', type=int, default=5,
                         help='image size')
+
+    parser.add_argument('--refine_version', type=int, default=1,
+                        help='The refine model version used.')
+    parser.add_argument('--refine_iteration', type=int, default=1,
+                        help="The number of refinement performed.")
 
     args = parser.parse_args()
     return args
