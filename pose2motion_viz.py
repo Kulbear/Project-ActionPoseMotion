@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from core.visualization import render_animation
 from core.data.generators import PoseGenerator
-from core.models import Encoder, Decoder, Seq2Seq
+from core.models import PoseLifter, MotionGenerator, Pose2MotNet
 from core.data.data_utils import fetch_inference, read_3d_data, create_2d_data
 
 from pose2motion_arguments import parse_args
@@ -46,13 +46,13 @@ def main(config):
                                batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
     print('Done!')
 
-    encoder = Encoder(config.encoder_ipt_dim, config.encoder_opt_dim,
-                      hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
-                      bidirectional=config.bidirectional, dropout_ratio=config.dropout)
-    decoder = Decoder(config.decoder_ipt_dim, config.decoder_opt_dim,
-                      hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
-                      bidirectional=config.bidirectional, dropout_ratio=config.dropout)
-    model_pos = Seq2Seq(encoder, decoder).to(device)
+    encoder = PoseLifter(config.encoder_ipt_dim, config.encoder_opt_dim,
+                         hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
+                         bidirectional=config.bidirectional, dropout_ratio=config.dropout)
+    decoder = MotionGenerator(config.decoder_ipt_dim, config.decoder_opt_dim,
+                              hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
+                              bidirectional=config.bidirectional, dropout_ratio=config.dropout)
+    model_pos = Pose2MotNet(encoder, decoder).to(device)
     model_pos.load_state_dict(torch.load(config.ckpt_path)['state_dict'])
 
     predicted_pose_sequence, pose_sequence_gt, predicted_motion_sequence, motion_sequence_gt, keypoint_sequence = \
