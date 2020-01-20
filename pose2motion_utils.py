@@ -115,13 +115,13 @@ def train(data_loader, pos2mot_model, criterion, optimizer, device, lr_init, lr_
 
     bar.finish()
 
-    if with_refinement:
+    if with_refinement:  # TODO: should we just return these two?
         return [rloss_3d_pose.avg, rloss_3d_motion.avg], lr_now, step
     else:
         return [mloss_3d_pose.avg, mloss_3d_motion.avg], lr_now, step
 
 
-def evaluate(data_loader, pos2mot_model, refine_model, device, inference_mode=False, refine_iteration=1):
+def evaluate(data_loader, pos2mot_model, device, inference_mode=False, refine_model=None, refine_iteration=1):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     mpjpe_pose = AverageMeter()
@@ -175,8 +175,10 @@ def evaluate(data_loader, pos2mot_model, refine_model, device, inference_mode=Fa
         # Evaluation
         pred_pose_3d = refined_pred_pose_3d.reshape(batch * seq_len, -1, 3).cpu()
         pose_3d = pose_3d.view(batch * seq_len, -1, 3)
-        motion_gt = motion_gt.view(batch * future_seq_len, -1, 3)
+
         pred_motion_3d = refined_pred_motion_3d.reshape(batch * future_seq_len, -1, 3).cpu()
+        motion_gt = motion_gt.view(batch * future_seq_len, -1, 3)
+
         pred_pose_3d = torch.cat([torch.zeros(batch * seq_len, 1, pred_pose_3d.size(2)), pred_pose_3d], 1)
         pred_motion_3d = torch.cat([torch.zeros(batch * future_seq_len, 1, pred_motion_3d.size(2)), pred_motion_3d], 1)
 

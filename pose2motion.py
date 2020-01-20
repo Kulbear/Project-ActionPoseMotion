@@ -102,7 +102,7 @@ def main(config):
 
     if config.refine_version == 1:
         RefineNet = RefineNetV1
-    elif config.refine_version == 2:
+    else:
         RefineNet = RefineNetV2
 
     refine_model = RefineNet(config.decoder_opt_dim, config.decoder_opt_dim,
@@ -131,10 +131,12 @@ def main(config):
 
         # Evaluate
         # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
-        errors = evaluate(valid_loader_pose, pos2mot_model, refine_model, device)
+        errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
+                          refine_model=refine_model, refine_iteration=config.refine_iteration)
         if evaluate_motion:
             errors = list(errors)
-            errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False)
+            errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
+                                     refine_model=refine_model, refine_iteration=config.refine_iteration)
             for i in range(2, len(errors)):
                 errors[i] = errors_motion[i]
 
