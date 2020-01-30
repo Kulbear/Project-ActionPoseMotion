@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-
 from core.data.mocap_dataset import MocapDataset
 
 

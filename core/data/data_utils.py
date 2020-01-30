@@ -16,7 +16,6 @@ def ntu_fetch(subjects, dataset, past=8, future=16, window_stride=8):
                 str_data = fr.readlines()
 
             num_frames = int(str_data[0].strip('\r\n'))
-            frames_drop = []
             bodies_data = dict()
             valid_frames = -1  # 0-based index
             current_line = 1
@@ -25,8 +24,7 @@ def ntu_fetch(subjects, dataset, past=8, future=16, window_stride=8):
                 num_bodies = int(str_data[current_line].strip('\r\n'))
                 current_line += 1
 
-                if num_bodies != 1:  # no data in this frame, drop it
-                    # frames_drop.append(f)  # 0-based index
+                if num_bodies != 1:
                     break
 
                 valid_frames += 1
@@ -58,12 +56,12 @@ def ntu_fetch(subjects, dataset, past=8, future=16, window_stride=8):
                         pre_frame_idx = body_data['interval'][-1]
                         body_data['interval'].append(pre_frame_idx + 1)  # add a new frame index
                     bodies_data[bodyID] = body_data  # Update bodies_data
-            for i in range(0, num_frames - past - future, window_stride):
+            for i in range(0, len(body_data['colors']) - past - future, window_stride):
                 num_data += 1
                 pose_2d_past_segments.append(body_data['colors'][i: i + past, :, :])
                 pose_3d_past_segments.append(body_data['joints'][i: i + past, :, :])
                 pose_3d_future_segments.append(body_data['joints'][i + past: i + past + future, :, :])
-                pose_actions.append(filename[16:20])
+                pose_actions.append(int(filename[17:20]) - 1)
         print('==> Finish Fetching subject:', subject)
         print('Total %d records' % num_data)
     print(len(pose_actions))
