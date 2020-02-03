@@ -29,7 +29,6 @@ def read_3d_data(dataset):
                 pos_3d[:, :] -= pos_3d[:, :1]  # Remove global offset
                 positions_3d.append(pos_3d)
             anim['positions_3d'] = positions_3d
-            # anim['positions_lie'] = positions_3d
     return dataset
 
 
