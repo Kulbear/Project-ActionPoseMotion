@@ -12,7 +12,7 @@ def parse_args():
     parser.add_argument('--dataset', default='h36m', type=str,
                         help='Target experiment dataset.')
     parser.add_argument('--keypoint_source', default='gt', type=str,
-                        help='2D detections to use.')
+                        help='2D detections to use. Could be one of "gt", "sh_ft" and "sh_pt_mpii".')
     parser.add_argument('--actions', default='*', type=str,
                         help='Actions to train/test on, separated by comma, or * for all.')
 
@@ -74,7 +74,7 @@ def parse_args():
                         help='The subject used in visualization.')
     parser.add_argument('--viz_target', default='past', type=str,
                         help='The visualization target, can be one of "past" or "future".')
-    parser.add_argument('--viz_camera', default=0, type=int,
+    parser.add_argument('--viz_camera', default=1, type=int,
                         help='The camera used in visualization.')
     parser.add_argument('--viz_action', default='Walking 1', type=str,
                         help='The action used in visualization.')
@@ -82,11 +82,11 @@ def parse_args():
                         help='path to input video')
     parser.add_argument('--viz_skip', type=int, default=0,
                         help='skip first N frames of input video')
-    parser.add_argument('--viz_output', type=str, default='visualization.gif',
+    parser.add_argument('--viz_output', type=str, default='vis.mp4',
                         help='output file name (.gif or .mp4)')
     parser.add_argument('--viz_bitrate', type=int, default=3000,
                         help='bitrate for mp4 videos')
-    parser.add_argument('--viz_limit', type=int, default=-1,
+    parser.add_argument('--viz_limit', type=int, default=500,
                         help='only render first N frames')
     parser.add_argument('--viz_downsample', type=int, default=1,
                         help='downsample FPS by a factor N')

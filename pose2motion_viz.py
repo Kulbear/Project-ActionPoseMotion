@@ -77,7 +77,7 @@ def main(config):
     input_keypoints = input_keypoints.reshape(-1, 16, 2)
     input_keypoints = image_coordinates(input_keypoints[..., :2], w=cam['res_w'], h=cam['res_h'])
 
-    render_animation(input_keypoints, anim_output, dataset.skeleton(), dataset.fps(), config.viz_bitrate,
+    render_animation(input_keypoints, anim_output, dataset.skeleton(), 5, config.viz_bitrate,
                      cam['azimuth'],
                      config.viz_output, limit=config.viz_limit, downsample=config.viz_downsample,
                      size=config.viz_size,
