@@ -253,7 +253,6 @@ class Human36mDataset(MocapDataset):
 
         # Load serialized dataset
         data = np.load(path, allow_pickle=True)['positions_3d'].item()
-
         self._data = {}
         for subject, actions in data.items():
             self._data[subject] = {}
