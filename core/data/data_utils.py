@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import general_utils as gu
 from core.transforms import world_to_camera, normalize_screen_coordinates
+from tqdm import tqdm
+import pickle
 
 
 def create_2d_data(data_path, dataset):
@@ -88,10 +90,21 @@ def fetch_inference(subject, dataset, keypoints,
 
 def fetch(subjects, dataset, keypoints,
           past=8, future=16, window_stride=None,
-          action_filter=None, time_stride=1, parse_3d_poses=True):
+          action_filter=None, time_stride=1, parse_3d_poses=True, train=True):
     # If not specified, use past size as the sliding window strides
     if window_stride is None:
         window_stride = past
+
+    # TODO: load lie_dataset from local or just load it directly
+    lie_name = 'train_data_lie.pkl' if train else 'valid_data_lie.pkl'
+    try:
+        lie_dataset = pickle.load(open(lie_name, 'rb'))
+        print('==> Found existing Lie repr!')
+    except:
+        print('==> No existing Lie repr, will create it online and save later.')
+        lie_dataset = {}
+
+    online_lie = False if lie_dataset else True
 
     out_poses_3d = []
     out_poses_2d = []
@@ -100,8 +113,12 @@ def fetch(subjects, dataset, keypoints,
 
     for subject in subjects:
         print('==> Fetching subject:', subject)
+        if online_lie:
+            lie_dataset[subject] = {}
         for action in keypoints[subject].keys():
-            # print('==> Fetching vide:', action)
+            # print('==> Fetching video:', action)
+            if online_lie:
+                lie_dataset[subject][action] = []
             action_type = action.split(' ')[0]
             # Example: subject => S1, action => Walking 1
             # Note the action is actually the video name
@@ -123,12 +140,20 @@ def fetch(subjects, dataset, keypoints,
             if parse_3d_poses and 'positions_3d' in dataset[subject][action]:
                 poses_3d = dataset[subject][action]['positions_3d']
                 assert len(poses_3d) == len(poses_2d), 'Camera count mismatch'
-                for i in range(len(poses_3d)):  # Iterate across cameras
+                for i in tqdm(range(len(poses_3d))):  # Iterate across cameras
                     out_poses_3d.append(poses_3d[i])
-                    out_poses_lie.append(convert_to_lie(poses_3d[i]))
+                    if online_lie:
+                        lie_repr = convert_to_lie(poses_3d[i])
+                        lie_dataset[subject][action].append(lie_repr)
+                        out_poses_lie.append(lie_repr)
+                    else:
+                        out_poses_lie.append(lie_dataset[subject][action][i])
 
     if len(out_poses_3d) == 0:
         out_poses_3d = None
+
+    if online_lie:
+        pickle.dump(lie_dataset, open(lie_name, 'wb'))
 
     if time_stride > 1:
         # Downsample as requested
@@ -213,6 +238,8 @@ tensor([[ 0.0000,  0.0000,  0.0000],
         [-0.2071,  0.0626,  0.1444],
         [-0.2288,  0.0095, -0.1007]])
 '''
+
+
 # input tensor size (num_joint = 16, 6) output tensor size (num_joint = 16, 3)
 def lie_to_euler_h36m_hard_code(lie_parameters):
     indices = []
@@ -281,8 +308,8 @@ def xyz_to_lie_parameters(joint_xyz):
         lie_parameters[j, 0: 3] = c
     return lie_parameters
 
-# input example
-'''
+
+""" input example
 array([[[ 0.0000,  0.0000,  0.0000],
         [-0.1320, -0.0143,  0.0073],
         [-0.0983,  0.0235, -0.4327],
@@ -331,16 +358,18 @@ array([[[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
           2.78892934e-01,  0.00000000e+00,  0.00000000e+00],
         [ 3.45872343e-01, -1.67232858e-01, -2.88497875e-01,
           2.51728743e-01,  0.00000000e+00,  0.00000000e+00]]])
-'''
+"""
+
+lie_index = [[0, 1, 2, 3],  # # right leg
+             [0, 4, 5, 6],  # left leg
+             [0, 7, 8, 9],  # head
+             [8, 10, 11, 12],  # left arm
+             [8, 13, 14, 15]]  # right arm
+
 
 # input numpy array size (time, num_joint, 3) output numpy array size (time, num_joint, 6)
 def convert_to_lie(joint_xyz):
-    index = []
-    index.append([0, 1, 2, 3])  # right leg
-    index.append([0, 4, 5, 6])  # left leg
-    index.append([0, 7, 8, 9])  # head
-    index.append([8, 10, 11, 12])  # left arm
-    index.append([8, 13, 14, 15])  # right arm
+    index = lie_index
     num_frame = joint_xyz.shape[0]
     lie_parameters = np.zeros([joint_xyz.shape[0], 16, 6])
     for i in range(num_frame):
