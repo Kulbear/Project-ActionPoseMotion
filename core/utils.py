@@ -1,6 +1,7 @@
 import os
 import torch
 import numpy as np
+from pathlib import Path
 
 
 class AverageMeter(object):
@@ -29,12 +30,34 @@ def lr_decay(optimizer, step, lr, decay_step, gamma):
     return lr
 
 
-def save_ckpt(state, ckpt_path, suffix=None):
+def save_ckpt(state, ckpt_path, best_error=None, suffix=None):
+    """
+    Example usage:
+    save_ckpt({'epoch': epoch + 1, 'lr': lr_now, 'step': glob_step,
+               'pos2mot_model': pos2mot_model.state_dict(),
+               'optimizer': optimizer.state_dict(),
+               'refine_model': refine_model.state_dict(),
+               'error_best_pose': errors[0], error_best_motion}, ckpt_dir_path, suffix='pose_best')
+    """
     if suffix is None:
         suffix = 'epoch_{:04d}'.format(state['epoch'])
 
     file_path = os.path.join(ckpt_path, 'ckpt_{}.pth.tar'.format(suffix))
     torch.save(state, file_path)
+
+
+def load_ckpt(ckpt_dir_path, ckpt_name):
+    """
+    Example return value:
+    {'epoch': epoch + 1, 'lr': lr_now, 'step': glob_step,
+     'pos2mot_model': pos2mot_model.state_dict(),
+     'optimizer': optimizer.state_dict(),
+     'refine_model': refine_model.state_dict(),
+     'error_best_pose': errors[0], error_best_motion}
+    """
+    state = torch.load(Path(ckpt_dir_path, ckpt_name + '.pth.tar'))
+    suffix = ckpt_name.split('_')[1:]
+    return state, suffix
 
 
 def wrap(func, unsqueeze, *args):

@@ -141,6 +141,8 @@ def evaluate(data_loader, pos2mot_model, device, inference_mode=False, refine_mo
     # Switch to evaluate mode
     torch.set_grad_enabled(False)
     pos2mot_model.eval()
+    if with_refinement:
+        refine_model.eval()
     end = time.time()
 
     bar = Bar('Eval ', max=len(data_loader))

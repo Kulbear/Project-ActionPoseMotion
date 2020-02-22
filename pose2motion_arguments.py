@@ -62,12 +62,14 @@ def parse_args():
                         help='The rate of learning rate decay.')
     parser.add_argument('--start_epoch', default=0, type=int,
                         help='Starting epoch number.')
-    parser.add_argument('--epochs', default=30, type=int,
+    parser.add_argument('--epochs', default=36, type=int,
                         help='The number of training epochs.')
 
     # evaluation
     parser.add_argument('--ckpt_path', default=None, type=str,
                         help='The path to the trained model.')
+    parser.add_argument('--evaluation', default=False, type=bool,
+                        help='Evaluation only mode.')
 
     # visualization
     parser.add_argument('--viz_subject', default='S1', type=str,

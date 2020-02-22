@@ -1,11 +1,9 @@
 import os
-from core.data.data_utils import fetch, read_3d_data, create_2d_data
 from pathlib import Path
 import torch
 import numpy as np
 from pose2motion_arguments import parse_args
-import general_utils as gu
-
+from core import lie_utils as gu
 
 index = []
 index.append([0, 1, 2, 3])  # right leg
