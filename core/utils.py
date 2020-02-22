@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from pathlib import Path
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -54,7 +55,7 @@ def load_ckpt(ckpt_dir_path, ckpt_name):
      'refine_model': refine_model.state_dict(),
      'error_best_pose': errors[0], error_best_motion}
     """
-    state = torch.load(Path(ckpt_dir_path, ckpt_name, '.pth.tar'))
+    state = torch.load(Path(ckpt_dir_path, ckpt_name + '.pth.tar'))
     suffix = ckpt_name.split('_')[1:]
     return state, suffix
 
