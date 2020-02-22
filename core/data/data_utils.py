@@ -1,9 +1,15 @@
-import numpy as np
 import torch
-import general_utils as gu
-from core.transforms import world_to_camera, normalize_screen_coordinates
-from tqdm import tqdm
 import pickle
+import numpy as np
+from core import lie_utils as gu
+from core.transforms import world_to_camera, normalize_screen_coordinates
+from pathlib import Path
+
+lie_index_h36m = [[0, 1, 2, 3],  # # right leg
+                  [0, 4, 5, 6],  # left leg
+                  [0, 7, 8, 9],  # head
+                  [8, 10, 11, 12],  # left arm
+                  [8, 13, 14, 15]]  # right arm
 
 
 def create_2d_data(data_path, dataset):
@@ -98,7 +104,7 @@ def fetch(subjects, dataset, keypoints,
     # TODO: load lie_dataset from local or just load it directly
     lie_name = 'train_data_lie.pkl' if train else 'valid_data_lie.pkl'
     try:
-        lie_dataset = pickle.load(open(lie_name, 'rb'))
+        lie_dataset = pickle.load(open(Path('data/h36m/', lie_name), 'rb'))
         print('==> Found existing Lie repr!')
     except:
         print('==> No existing Lie repr, will create it online and save later.')
@@ -140,7 +146,7 @@ def fetch(subjects, dataset, keypoints,
             if parse_3d_poses and 'positions_3d' in dataset[subject][action]:
                 poses_3d = dataset[subject][action]['positions_3d']
                 assert len(poses_3d) == len(poses_2d), 'Camera count mismatch'
-                for i in tqdm(range(len(poses_3d))):  # Iterate across cameras
+                for i in range(len(poses_3d)):  # Iterate across cameras
                     out_poses_3d.append(poses_3d[i])
                     if online_lie:
                         lie_repr = convert_to_lie(poses_3d[i])
@@ -151,6 +157,7 @@ def fetch(subjects, dataset, keypoints,
 
     if len(out_poses_3d) == 0:
         out_poses_3d = None
+        out_poses_lie = None
 
     if online_lie:
         pickle.dump(lie_dataset, open(lie_name, 'wb'))
@@ -170,6 +177,7 @@ def fetch(subjects, dataset, keypoints,
     pose_3d_past_segments = []
     pose_3d_future_segments = []
     pose_lie_segments = []
+    pose_lie_future_segments = []
     pose_actions = []
 
     for cam_idx in range(len(out_poses_2d)):
@@ -180,8 +188,12 @@ def fetch(subjects, dataset, keypoints,
                 pose_3d_past_segments.append(out_poses_3d[cam_idx][i - past:i])
                 pose_3d_future_segments.append(out_poses_3d[cam_idx][i:i + future])
                 pose_lie_segments.append(out_poses_lie[cam_idx][i - past:i])
+                pose_lie_future_segments.append(out_poses_lie[cam_idx][i:i + future])
 
-    return pose_2d_past_segments, pose_3d_past_segments, pose_3d_future_segments, pose_lie_segments, pose_actions
+    return (pose_2d_past_segments, pose_3d_past_segments,
+            pose_3d_future_segments,
+            pose_lie_segments, pose_lie_future_segments,
+            pose_actions)
 
 
 # input example
@@ -241,24 +253,18 @@ tensor([[ 0.0000,  0.0000,  0.0000],
 
 
 # input tensor size (num_joint = 16, 6) output tensor size (num_joint = 16, 3)
-def lie_to_euler_h36m_hard_code(lie_parameters):
-    indices = []
-    indices.append([0, 1, 2, 3])  # right leg
-    indices.append([0, 4, 5, 6])  # left leg
-    indices.append([0, 7, 8, 9])  # head
-    indices.append([8, 10, 11, 12])  # left arm
-    indices.append([8, 13, 14, 15])  # right arm
+def lie_to_euler_h36m_hard_code(lie_parameters, lie_index=lie_index_h36m):
     output = torch.zeros(size=(16, 3))
-    for i in range(len(indices)):
-        euler = lie_to_euler(lie_parameters[indices[i]])
-        if indices[i][0] == 0:
-            output[indices[i]] = euler
+    for i in range(len(lie_index)):
+        euler = lie_to_euler(lie_parameters[lie_index[i]])
+        if lie_index[i][0] == 0:
+            output[lie_index[i]] = euler
         else:
             print(euler)
-            euler = euler - euler[0] + output[indices[i][0]]
+            euler = euler - euler[0] + output[lie_index[i][0]]
             print(euler)
-            output[indices[i]] = euler
-            output[indices[i]] = euler
+            output[lie_index[i]] = euler
+            output[lie_index[i]] = euler
     return output
 
 
@@ -360,22 +366,15 @@ array([[[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
           2.51728743e-01,  0.00000000e+00,  0.00000000e+00]]])
 """
 
-lie_index = [[0, 1, 2, 3],  # # right leg
-             [0, 4, 5, 6],  # left leg
-             [0, 7, 8, 9],  # head
-             [8, 10, 11, 12],  # left arm
-             [8, 13, 14, 15]]  # right arm
-
 
 # input numpy array size (time, num_joint, 3) output numpy array size (time, num_joint, 6)
-def convert_to_lie(joint_xyz):
-    index = lie_index
+def convert_to_lie(joint_xyz, lie_index=lie_index_h36m):
     num_frame = joint_xyz.shape[0]
     lie_parameters = np.zeros([joint_xyz.shape[0], 16, 6])
     for i in range(num_frame):
         joint_xyz[i, :, :] = joint_xyz[i, :, :] - joint_xyz[i, 0, :]
-        for k in range(len(index)):
-            lie_parameters[i, 3 * k + 1: 3 * k + 4, :] = xyz_to_lie_parameters(joint_xyz[i][index[k]])
+        for k in range(len(lie_index)):
+            lie_parameters[i, 3 * k + 1: 3 * k + 4, :] = xyz_to_lie_parameters(joint_xyz[i][lie_index[k]])
     return lie_parameters
 
 
@@ -394,7 +393,7 @@ def expmap2rotmat(A):
     else:
         A = A / theta
         cross_matrix = torch.tensor([[0, -A[2], A[1]], [A[2], 0, -A[0]], [-A[1], A[0], 0]])
-        R = torch.eye(3) + torch.sin(theta) * cross_matrix + (torch.ones(3) - torch.cos(theta)) * torch.matmul(
-            cross_matrix,
-            cross_matrix)
+        R = torch.eye(3) + \
+            torch.sin(theta) * cross_matrix + \
+            (torch.ones(3) - torch.cos(theta)) * torch.matmul(cross_matrix, cross_matrix)
     return R
