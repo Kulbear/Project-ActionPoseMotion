@@ -68,7 +68,9 @@ class Pose2MotNet(nn.Module):
         self.decoder = decoder
         self.device = device
 
-    def forward(self, x, gt, teacher_forcing_ratio=0.5):
+    def forward(self, x, gt,
+                teacher_forcing_ratio=0.5,
+                pos_loss_on=True, mot_loss_on=True):
         batch_size, seq_len = gt.size()[:2]
         outputs = torch.zeros(batch_size, seq_len, self.decoder.opt_dim).to(self.device)
 
@@ -76,6 +78,11 @@ class Pose2MotNet(nn.Module):
         encoder_output = self.encoder(x)
         past_pose_sequence = encoder_output['pose_3d']
         hidden = encoder_output['encoder_hidden']
+        if not mot_loss_on:
+            return {
+                'past_pose': past_pose_sequence,
+                'future_motion': None
+            }
         # first input to the decoder is the last pose we observed
         output = past_pose_sequence[:, -1, :].unsqueeze(1)
 
@@ -92,8 +99,13 @@ class Pose2MotNet(nn.Module):
                 output = gt[:, t, :].unsqueeze(1)
             else:
                 output = outputs[:, t, :].unsqueeze(1)
-
-        return {
-            'past_pose': past_pose_sequence,
-            'future_motion': outputs
-        }
+        if not pos_loss_on:
+            return {
+                'past_pose': None,
+                'future_motion': outputs
+            }
+        else:
+            return {
+                'past_pose': past_pose_sequence,
+                'future_motion': outputs
+            }

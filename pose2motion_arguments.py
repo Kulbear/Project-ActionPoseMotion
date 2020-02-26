@@ -48,6 +48,10 @@ def parse_args():
                         help='The number of hidden dimensions in the encoder and the decoder.')
     parser.add_argument('--dropout', default=0., type=float,
                         help='Dropout rate used in all dropout layers.')
+    parser.add_argument('--pos_loss_on', default=True, type=bool,
+                        help='Whether to turn on pose loss.')
+    parser.add_argument('--mot_loss_on', default=True, type=bool,
+                        help='Whether to turn on motion loss.')
 
     # training
     parser.add_argument('--visible_devices', default='0', type=str,

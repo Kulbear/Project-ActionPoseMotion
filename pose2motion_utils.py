@@ -8,31 +8,27 @@ from core.metrics import mpjpe, p_mpjpe
 from core.utils import AverageMeter, lr_decay
 
 
-def calculate_refinement_stage_loss(refined_prediction, pose_3d, motion_gt, loss_function,
-                                    batch_size, pose_seq_len, future_seq_len, opt_dim):
-    refined_pose_3d = refined_prediction[:, :pose_seq_len, :]
-    refined_motion_3d = refined_prediction[:, pose_seq_len:, :]
-    loss_3d_pose = loss_function(refined_pose_3d.reshape(batch_size * pose_seq_len, opt_dim),
-                                 pose_3d.view(batch_size * pose_seq_len, opt_dim))
-    loss_3d_motion = loss_function(refined_motion_3d.reshape(batch_size * future_seq_len, opt_dim),
-                                   motion_gt.view(batch_size * future_seq_len, opt_dim))
-    return loss_3d_pose, loss_3d_motion
+def calculate_refinement_stage_loss(refined_prediction, refined_gt, loss_function):
+    batch_size, seq_len, out_dim = refined_prediction.size()
+    loss = loss_function(refined_prediction.reshape(batch_size * seq_len, out_dim),
+                         refined_gt.view(batch_size * seq_len, out_dim))
+    return loss
 
 
-def train(data_loader, pos2mot_model, criterion, optimizer, device, lr_init, lr_now,
-          step, decay, gamma, max_norm=True, refine_model=None, refine_iteration=1):
+def train(data_loader, pos2mot_model, criterion,
+          optimizer, device, lr_init, lr_now,
+          step, decay, gamma, max_norm=True,
+          refine_model=None, refine_iteration=1,
+          pos_loss_on=True, mot_loss_on=False):
     # Whether do refinement?
-    with_refinement = refine_model is not None and refine_iteration
+    with_refinement = refine_model is not None and refine_iteration > 0
 
     # Meters
     batch_time = AverageMeter()
     data_time = AverageMeter()
     mloss_3d_pose = AverageMeter()
     mloss_3d_motion = AverageMeter()
-
-    # Used only when with_refinement=True
-    rloss_3d_pose = AverageMeter()
-    rloss_3d_motion = AverageMeter()
+    rloss_3d = AverageMeter()
 
     # Switch to train mode
     torch.set_grad_enabled(True)
@@ -66,59 +62,79 @@ def train(data_loader, pos2mot_model, criterion, optimizer, device, lr_init, lr_
         motion_gt = motion_gt[:, :, 1:, :].to(device).view(batch, future_seq_len, -1)
 
         # Forward pass
-        pred = pos2mot_model(pose_2d, motion_gt)
+        pred = pos2mot_model(pose_2d, motion_gt, pos_loss_on=True, mot_loss_on=True)
         pred_pose_3d = pred['past_pose']
         pred_motion_3d = pred['future_motion']
 
         # Multi-stage refinement module
-        refined_loss_3d_pose, refined_loss_3d_motion = 0, 0
+        refined_loss = 0
         if with_refinement:
-            refined_pred = torch.cat((pred_pose_3d, pred_motion_3d), 1)
+            traj = []
+            traj_gt = []
+            if pos_loss_on:
+                traj.append(pred_pose_3d)
+                traj_gt.append(pose_3d)
+            if mot_loss_on:
+                traj.append(pred_motion_3d)
+                traj_gt.append(motion_gt)
+            if len(traj) == 1:
+                refined_pred = traj[0]
+                refined_gt = traj_gt[0]
+            else:
+                refined_pred = torch.cat(traj, 1)
+                refined_gt = torch.cat(traj_gt, 1)
             for _ in range(refine_iteration):
                 refined_pred = refine_model(refined_pred)['refined_3d']
-                # Multi-stage loss is calculated and summed up here
-                rloss, mloss = calculate_refinement_stage_loss(refined_pred, pose_3d, motion_gt, criterion,
-                                                               batch, seq_len, future_seq_len, opt_dim)
-                refined_loss_3d_pose += rloss
-                refined_loss_3d_motion += mloss
+                loss = calculate_refinement_stage_loss(refined_pred, refined_gt, criterion)
+                refined_loss += loss
 
         # Back-propagation
         optimizer.zero_grad()
-        loss_3d_pose = criterion(pred_pose_3d.view(batch * seq_len, opt_dim), pose_3d.view(batch * seq_len, opt_dim))
-        loss_3d_motion = criterion(pred_motion_3d.view(batch * future_seq_len, opt_dim),
-                                   motion_gt.view(batch * future_seq_len, opt_dim))
+
+        loss_3d = 0
+        total_seq_len = 0
+        if pos_loss_on:
+            loss_3d_pose = criterion(pred_pose_3d.view(batch * seq_len, opt_dim),
+                                     pose_3d.view(batch * seq_len, opt_dim))
+            mloss_3d_pose.update(loss_3d_pose.item(), batch * seq_len)
+            loss_3d += loss_3d_pose
+            total_seq_len += seq_len
+
+        if mot_loss_on:
+            loss_3d_motion = criterion(pred_motion_3d.view(batch * future_seq_len, opt_dim),
+                                       motion_gt.view(batch * future_seq_len, opt_dim))
+            loss_3d += loss_3d_motion
+            mloss_3d_motion.update(loss_3d_motion.item(), batch * future_seq_len)
+            total_seq_len += future_seq_len
+
         if with_refinement:
-            loss_3d = loss_3d_pose + loss_3d_motion + refined_loss_3d_pose + refined_loss_3d_motion
-        else:
-            loss_3d = loss_3d_pose + loss_3d_motion
+            rloss_3d.update(refined_loss.item(), batch * total_seq_len)
+            loss_3d += refined_loss
+
         loss_3d.backward()
         if max_norm:
             nn.utils.clip_grad_norm_(pos2mot_model.parameters(), max_norm=1)
         optimizer.step()
 
-        # Update meters with computed losses
-        mloss_3d_pose.update(loss_3d_pose.item(), batch * seq_len)
-        mloss_3d_motion.update(loss_3d_motion.item(), batch * future_seq_len)
-        if with_refinement:
-            rloss_3d_pose.update(refined_loss_3d_pose.item(), batch * seq_len)
-            rloss_3d_motion.update(refined_loss_3d_motion.item(), batch * future_seq_len)
+        # Update time meters
         batch_time.update(time.time() - end)
         end = time.time()
 
         # Progress bar text
         bar.suffix = f'({i + 1}/{len(data_loader)}) D.: {data_time.val:.4f}s | B.: {batch_time.avg:.3f}s ' \
-                     f'| Ttl: {bar.elapsed_td:} | ETA: {bar.eta_td:}' \
-                     f'| LPos: {mloss_3d_pose.avg: .5f} | LMot: {mloss_3d_motion.avg: .6f}'
+                     f'| Ttl: {bar.elapsed_td:} | ETA: {bar.eta_td:}'
+
+        if pos_loss_on:
+            bar.suffix += f'| LPos: {mloss_3d_pose.avg: .5f} '
+        if mot_loss_on:
+            bar.suffix += f'| LMot: {mloss_3d_motion.avg: .6f}'
         if with_refinement:
-            bar.suffix += f'| rLPos: {rloss_3d_pose.avg: .5f} | rLMot: {rloss_3d_motion.avg: .6f}'
+            bar.suffix += f'| rLPos: {rloss_3d.avg: .5f} |'
         bar.next()
 
     bar.finish()
 
-    if with_refinement:  # TODO: should we just return these two?
-        return [rloss_3d_pose.avg, rloss_3d_motion.avg], lr_now, step
-    else:
-        return [mloss_3d_pose.avg, mloss_3d_motion.avg], lr_now, step
+    return [mloss_3d_pose.avg, mloss_3d_motion.avg], lr_now, step
 
 
 def evaluate(data_loader, pos2mot_model, device, inference_mode=False, refine_model=None, refine_iteration=1):
@@ -129,7 +145,7 @@ def evaluate(data_loader, pos2mot_model, device, inference_mode=False, refine_mo
     mpjpe_motion = AverageMeter()
     mpjpe_motion_raligned = AverageMeter()
 
-    with_refinement = refine_model is not None and refine_iteration
+    with_refinement = refine_model is not None and refine_iteration > 0
 
     if inference_mode:
         keypoint_sequence = []
