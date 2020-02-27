@@ -126,6 +126,8 @@ def main(config):
     if config.mot_loss_on:
         parameter_to_optim += list(decoder.parameters())
     optimizer = torch.optim.Adam(parameter_to_optim, lr=config.lr)
+    lr_sch = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, patience=3,
+                                                        verbose=True, cooldown=0, min_lr=0.00005, eps=1e-08)
 
     # Resume or start from scratch
     if config.ckpt_path is not None:
@@ -182,18 +184,28 @@ def main(config):
                                                                         refine_model=refine_model,
                                                                         refine_iteration=config.refine_iteration,
                                                                         pos_loss_on=config.pos_loss_on,
-                                                                        mot_loss_on=config.mot_loss_on)
+                                                                        mot_loss_on=config.mot_loss_on,
+                                                                        step_lr=config.lr_schedule == 'step')
 
             # Evaluate
             # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
             errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
                               refine_model=refine_model, refine_iteration=config.refine_iteration)
+
             if evaluate_motion:
                 errors = list(errors)
                 errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
                                          refine_model=refine_model, refine_iteration=config.refine_iteration)
                 for i in range(2, len(errors)):
                     errors[i] = errors_motion[i]
+
+            if config.lr_schedule == 'reduce':
+                if config.primary_target == 'pose':
+                    lr_sch.step(errors[0])
+                elif config.primary_target == 'motion':
+                    lr_sch.step(errors[2])
+                else:
+                    raise NotImplementedError('Primary target has to be set as "pose" or "motion"!')
 
             # Update log file
             logger.append([epoch + 1, glob_step, lr_now, epoch_loss, *errors])
@@ -207,6 +219,7 @@ def main(config):
                 'error_best_pose': error_best_pose,
                 'error_best_motion': error_best_motion
             }
+
             if error_best_pose is None or error_best_pose > errors[0]:
                 error_best_pose = errors[0]
                 suffix = 'pose_best'

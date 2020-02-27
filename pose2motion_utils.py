@@ -19,7 +19,7 @@ def train(data_loader, pos2mot_model, criterion,
           optimizer, device, lr_init, lr_now,
           step, decay, gamma, max_norm=True,
           refine_model=None, refine_iteration=1,
-          pos_loss_on=True, mot_loss_on=False):
+          pos_loss_on=True, mot_loss_on=False, step_lr=True):
     # Whether do refinement?
     with_refinement = refine_model is not None and refine_iteration > 0
 
@@ -45,7 +45,7 @@ def train(data_loader, pos2mot_model, criterion,
 
         # Adjust learning rate if decay condition is satisfied
         step += 1
-        if step % decay == 0:
+        if step_lr and step % decay == 0:
             lr_now = lr_decay(optimizer, step, lr_init, decay, gamma)
 
         # Parse data
@@ -134,7 +134,7 @@ def train(data_loader, pos2mot_model, criterion,
 
     bar.finish()
 
-    return [mloss_3d_pose.avg, mloss_3d_motion.avg], lr_now, step
+    return [mloss_3d_pose.avg, mloss_3d_motion.avg, rloss_3d.avg], lr_now, step
 
 
 def evaluate(data_loader, pos2mot_model, device, inference_mode=False, refine_model=None, refine_iteration=1):

@@ -21,12 +21,12 @@ def parse_args():
                         help='The length of the (observed) past pose sequence that we want to lift from 2D to 3D.')
     parser.add_argument('--future', default=16, type=int,
                         help='The length of the future motion sequence that we want to generate.')
-    parser.add_argument('--time_stride', default=1, type=int,
+    parser.add_argument('--time_stride', default=2, type=int,
                         help='The stride size used for (possibly) downsampling the frame rate. '
                              'For example, time_stride = 2 means we down sample 30 fps to 15 fps.')
     parser.add_argument('--window_stride', default=4, type=int,
                         help='The stride size used for generating pose sequence.')
-    parser.add_argument('--batch_size', default=64, type=int,
+    parser.add_argument('--batch_size', default=32, type=int,
                         help='Dare you don\'t know what this is? Hah!')
     parser.add_argument('--num_workers', default=4, type=int,
                         help='The number of workers used for the dataloader.')
@@ -58,10 +58,10 @@ def parse_args():
                         help='Visible device for using.')
     parser.add_argument('--device', default='cuda', type=str,
                         help='Device used for training.')
-    parser.add_argument('--lr', default=2e-3, type=float,
+    parser.add_argument('--lr', default=1e-3, type=float,
                         help='Initial learning rate.')
     parser.add_argument('--lr_schedule', default='step', type=str,
-                        help='The learning rate scheduler in use.')
+                        help='The learning rate scheduler in use. Possible values are "step", "reduce"')
     parser.add_argument('--lr_decay', type=int, default=10000,
                         help='The number of iterations that we perform learning rate decay.')
     parser.add_argument('--lr_gamma', type=float, default=0.9,
@@ -70,6 +70,8 @@ def parse_args():
                         help='Starting epoch number.')
     parser.add_argument('--epochs', default=36, type=int,
                         help='The number of training epochs.')
+    parser.add_argument('--primary_target', default='pose', type=str,
+                        help='Primary training target. Could be either "pose" or "motion"')
 
     # evaluation
     parser.add_argument('--ckpt_path', default=None, type=str,
