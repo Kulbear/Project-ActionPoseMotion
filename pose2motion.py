@@ -118,10 +118,14 @@ def main(config):
     print('Pose model # params:', total_params)
 
     criterion = nn.MSELoss().to(device)
+    parameter_to_optim = []
     if refine_model is not None:
-        optimizer = torch.optim.Adam(list(pos2mot_model.parameters()) + list(refine_model.parameters()), lr=config.lr)
-    else:
-        optimizer = torch.optim.Adam(pos2mot_model.parameters(), lr=config.lr)
+        parameter_to_optim += list(refine_model.parameters())
+    if config.pos_loss_on:
+        parameter_to_optim += list(encoder.parameters())
+    if config.mot_loss_on:
+        parameter_to_optim += list(decoder.parameters())
+    optimizer = torch.optim.Adam(parameter_to_optim, lr=config.lr)
 
     # Resume or start from scratch
     if config.ckpt_path is not None:

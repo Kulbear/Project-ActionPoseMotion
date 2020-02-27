@@ -251,7 +251,6 @@ tensor([[ 0.0000,  0.0000,  0.0000],
         [-0.2288,  0.0095, -0.1007]])
 '''
 
-
 # input tensor size (num_joint = 16, 6) output tensor size (num_joint = 16, 3)
 def lie_to_euler_h36m_hard_code(lie_parameters, lie_index=lie_index_h36m):
     output = torch.zeros(size=(16, 3))
@@ -260,10 +259,9 @@ def lie_to_euler_h36m_hard_code(lie_parameters, lie_index=lie_index_h36m):
         if lie_index[i][0] == 0:
             output[lie_index[i]] = euler
         else:
-            print(euler)
+            # print(euler)
             euler = euler - euler[0] + output[lie_index[i][0]]
-            print(euler)
-            output[lie_index[i]] = euler
+            # print(euler)
             output[lie_index[i]] = euler
     return output
 
@@ -299,6 +297,7 @@ def xyz_to_lie_parameters(joint_xyz):
     for j in range(num_joint - 1):
         lie_parameters[j, 3] = np.linalg.norm(
             (joint_xyz[j, :] - joint_xyz[j + 1, :]))
+
     # Axis angle parameters of rotation
     for j in range(num_joint - 2, -1, -1):
         v = np.squeeze(joint_xyz[j + 1, :] - joint_xyz[[j], :])
@@ -365,9 +364,8 @@ array([[[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
         [ 3.45872343e-01, -1.67232858e-01, -2.88497875e-01,
           2.51728743e-01,  0.00000000e+00,  0.00000000e+00]]])
 """
-
-
-# input numpy array size (time, num_joint, 3) output numpy array size (time, num_joint, 6)
+# input numpy array size (time, num_joint, 3)
+# output numpy array size (time, num_joint, 6)
 def convert_to_lie(joint_xyz, lie_index=lie_index_h36m):
     num_frame = joint_xyz.shape[0]
     lie_parameters = np.zeros([joint_xyz.shape[0], 16, 6])

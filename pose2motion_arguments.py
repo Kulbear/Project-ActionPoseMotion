@@ -48,9 +48,9 @@ def parse_args():
                         help='The number of hidden dimensions in the encoder and the decoder.')
     parser.add_argument('--dropout', default=0., type=float,
                         help='Dropout rate used in all dropout layers.')
-    parser.add_argument('--pos_loss_on', default=True, type=bool,
+    parser.add_argument('--pos_loss_on', default=1, type=int,
                         help='Whether to turn on pose loss.')
-    parser.add_argument('--mot_loss_on', default=True, type=bool,
+    parser.add_argument('--mot_loss_on', default=1, type=int,
                         help='Whether to turn on motion loss.')
 
     # training
@@ -60,6 +60,8 @@ def parse_args():
                         help='Device used for training.')
     parser.add_argument('--lr', default=2e-3, type=float,
                         help='Initial learning rate.')
+    parser.add_argument('--lr_schedule', default='step', type=str,
+                        help='The learning rate scheduler in use.')
     parser.add_argument('--lr_decay', type=int, default=10000,
                         help='The number of iterations that we perform learning rate decay.')
     parser.add_argument('--lr_gamma', type=float, default=0.9,
