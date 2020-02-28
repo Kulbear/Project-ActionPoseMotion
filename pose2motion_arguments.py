@@ -52,6 +52,8 @@ def parse_args():
                         help='Whether to turn on pose loss.')
     parser.add_argument('--mot_loss_on', default=1, type=int,
                         help='Whether to turn on motion loss.')
+    parser.add_argument('--include_lie_repr', default=0, type=int,
+                        help='Whether to include lie representation.')
 
     # training
     parser.add_argument('--visible_devices', default='0', type=str,
