@@ -7,7 +7,8 @@ import torch.nn as nn
 class TrajRefinementModule(nn.Module):
     def __init__(self, ipt_dim, opt_dim,
                  hid_dim=128, n_layers=1, bidirectional=False,
-                 dropout_ratio=0.5, size=(64, 28, 45)):
+                 dropout_ratio=0.5, size=(64, 28, 45),
+                 include_lie_repr=False):
         super(TrajRefinementModule, self).__init__()
         # config
         self.ipt_dim = ipt_dim
@@ -40,7 +41,8 @@ class TrajRefinementModule(nn.Module):
 class ResTrajRefinementModule(nn.Module):
     def __init__(self, ipt_dim, opt_dim,
                  hid_dim=128, n_layers=1, bidirectional=False,
-                 dropout_ratio=0.5, size=(64, 28, 45)):
+                 dropout_ratio=0.5, size=(64, 28, 45),
+                 include_lie_repr=False):
         super(ResTrajRefinementModule, self).__init__()
         # config
         self.ipt_dim = ipt_dim
