@@ -32,6 +32,8 @@ class TrajRefinementModule(nn.Module):
         self.post_rnn = nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
 
     def forward(self, x):
+        print(x.size())
+        print(self.pre_rnn)
         x = self.pre_rnn(x)
         x, hidden = self.rnn(x)
         x = self.post_rnn(x)
@@ -66,6 +68,8 @@ class ResTrajRefinementModule(nn.Module):
         self.post_rnn = nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
 
     def forward(self, x):
+        # print(x.size())
+        # print(self.pre_rnn)
         identity = x
         x = self.pre_rnn(x)
         x, hidden = self.rnn(x)

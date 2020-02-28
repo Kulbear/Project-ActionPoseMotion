@@ -47,7 +47,7 @@ class PoseGenerator(Dataset):
             'pose_3d': out_3d_past,
             'future_pose_3d': out_3d_future,
             'pose_lie': out_lie,
-            'pose_lie_future': out_lie_future,
+            'future_pose_lie': out_lie_future,
             'action_type': ACTION_INDEX_MAP[self._actions[index]]
         }
 

@@ -77,7 +77,7 @@ class MotionGeneratorLie(nn.Module):
     def __init__(self, ipt_dim, opt_dim, hid_dim=128,
                  n_layers=1, bidirectional=True, dropout_ratio=0.5,
                  include_lie_repr=False):
-        super(MotionGenerator, self).__init__()
+        super(MotionGeneratorLie, self).__init__()
         # config
         self.ipt_dim = ipt_dim
         self.hid_dim = hid_dim
@@ -94,8 +94,13 @@ class MotionGeneratorLie(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hid_dim // 2, self.hid_dim)
         )
-        self.rnn = nn.LSTM(self.hid_dim, self.hid_dim * 2, self.n_layers,
-                           bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+        if self.include_lie_repr:
+            self.rnn = nn.LSTM(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
+                               bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+        else:
+            self.rnn = nn.LSTM(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
+                               bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+
         self.post_rnn = nn.Sequential(
             nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
         )
@@ -146,7 +151,7 @@ class Pose2MotNet(nn.Module):
         self.device = device
         self.include_lie_repr = include_lie_repr
 
-    def forward(self, x, gt, gt_lie,
+    def forward(self, x, gt, gt_lie=None,
                 teacher_forcing_ratio=0.5,
                 pos_loss_on=True, mot_loss_on=True):
         batch_size, seq_len = gt.size()[:2]
@@ -177,6 +182,8 @@ class Pose2MotNet(nn.Module):
                 prediction = self.decoder(output, (hidden, hidden))
             else:
                 prediction = self.decoder(output, hidden)
+            # print(prediction['motion_3d'].size())
+            # print(prediction['motion_lie'].size())
             outputs[:, t, :] = prediction['motion_3d'].squeeze()
             outputs_lie[:, t, :] = prediction['motion_lie'].squeeze()
             hidden = prediction['decoder_hidden']
