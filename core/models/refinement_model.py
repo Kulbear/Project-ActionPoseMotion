@@ -20,16 +20,26 @@ class TrajRefinementModule(nn.Module):
         hid_dim_factor = 2 if self.bidirectional else 1
 
         # layers
-        self.pre_rnn = nn.Sequential(
-            nn.Linear(self.ipt_dim, self.hid_dim // 2),
-            nn.ReLU(),
-            nn.Linear(self.hid_dim // 2, self.hid_dim)
-        )
+        # layers
+        if include_lie_repr:
+            print('Large Refinement!!')
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim, self.hid_dim * 2)
+            )
 
-        self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
-                          bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+            self.rnn = nn.GRU(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+        else:
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim // 2),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim // 2, self.hid_dim)
+            )
 
-        self.post_rnn = nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
+            self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
 
     def forward(self, x):
         print(x.size())
@@ -56,14 +66,25 @@ class ResTrajRefinementModule(nn.Module):
         hid_dim_factor = 2 if self.bidirectional else 1
 
         # layers
-        self.pre_rnn = nn.Sequential(
-            nn.Linear(self.ipt_dim, self.hid_dim // 2),
-            nn.ReLU(),
-            nn.Linear(self.hid_dim // 2, self.hid_dim)
-        )
+        if include_lie_repr:
+            print('Large Refinement!!')
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim, self.hid_dim * 2)
+            )
 
-        self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
-                          bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+            self.rnn = nn.GRU(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+        else:
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim // 2),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim // 2, self.hid_dim)
+            )
+
+            self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
 
         self.post_rnn = nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
 
