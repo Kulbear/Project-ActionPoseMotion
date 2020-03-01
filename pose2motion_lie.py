@@ -8,7 +8,8 @@ from torch.utils.data import DataLoader
 from core.log import Logger, save_fig, save_config
 from core.data.generators import PoseGenerator
 from core.models import (
-    PoseLifter, MotionGenerator, Pose2MotNet,
+    PoseLifter, MotionGenerator, MotionGeneratorLie,
+    Pose2MotNet,
     REFINEMENT_ARCHS
 )
 from core.utils import save_ckpt, load_ckpt
@@ -97,11 +98,14 @@ def main(config):
 
     encoder = PoseLifter(config.encoder_ipt_dim, config.encoder_opt_dim,
                          hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
-                         bidirectional=config.bidirectional, dropout_ratio=config.dropout)
-    decoder = MotionGenerator(config.decoder_ipt_dim, config.decoder_opt_dim,
-                              hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
-                              bidirectional=config.bidirectional, dropout_ratio=config.dropout)
-    pos2mot_model = Pose2MotNet(encoder, decoder).to(device)
+                         bidirectional=config.bidirectional, dropout_ratio=config.dropout,
+                         include_lie_repr=config.include_lie_repr)
+    decoder = MotionGeneratorLie(config.decoder_ipt_dim, config.decoder_opt_dim,
+                                 hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
+                                 bidirectional=config.bidirectional, dropout_ratio=config.dropout,
+                                 include_lie_repr=config.include_lie_repr)
+
+    pos2mot_model = Pose2MotNet(encoder, decoder, include_lie_repr=config.include_lie_repr).to(device)
     total_params = sum(p.numel() for p in pos2mot_model.parameters() if p.requires_grad)
     print('Pose model # params:', total_params)
 
@@ -109,13 +113,26 @@ def main(config):
     if not RefineNet:
         raise NotImplementedError('Unknown refinement architecture!')
 
-    refine_model = RefineNet(config.decoder_opt_dim, config.decoder_opt_dim,
-                             hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
-                             bidirectional=config.bidirectional, dropout_ratio=config.dropout,
-                             size=(config.batch_size, config.past + config.future, 45)).to(device)
+    if config.include_lie_repr:
+        assert config.refine_version in (1, 2)
+        refine_model = RefineNet(config.decoder_opt_dim * 3, config.decoder_opt_dim * 3,
+                                 hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
+                                 bidirectional=config.bidirectional, dropout_ratio=config.dropout,
+                                 size=(config.batch_size, config.past + config.future, config.decoder_opt_dim * 3),
+                                 include_lie_repr=config.include_lie_repr).to(device)
+        total_params = sum(p.numel() for p in refine_model.parameters() if p.requires_grad)
+        print('Refine model # params:', total_params)
 
-    total_params = sum(p.numel() for p in refine_model.parameters() if p.requires_grad)
-    print('Pose model # params:', total_params)
+    else:
+        refine_model = RefineNet(config.decoder_opt_dim, config.decoder_opt_dim,
+                                 hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
+                                 bidirectional=config.bidirectional, dropout_ratio=config.dropout,
+                                 size=(config.batch_size,
+                                       config.past + config.future,
+                                       config.decoder_opt_dim)).to(device)
+
+        total_params = sum(p.numel() for p in refine_model.parameters() if p.requires_grad)
+        print('Refine model # params:', total_params)
 
     criterion = nn.MSELoss().to(device)
     parameter_to_optim = []
@@ -158,11 +175,13 @@ def main(config):
     if config.evaluation:
         if config.ckpt_path is not None:
             errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
-                              refine_model=refine_model, refine_iteration=config.refine_iteration)
+                              refine_model=refine_model, refine_iteration=config.refine_iteration,
+                              include_lie_repr=config.include_lie_repr)
             if evaluate_motion:
                 errors = list(errors)
                 errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
-                                         refine_model=refine_model, refine_iteration=config.refine_iteration)
+                                         refine_model=refine_model, refine_iteration=config.refine_iteration,
+                                         include_lie_repr=config.include_lie_repr)
                 for i in range(2, len(errors)):
                     errors[i] = errors_motion[i]
 
@@ -178,24 +197,26 @@ def main(config):
 
             # Train for one epoch
             [epoch_loss, epoch_loss_mot, *_], lr_now, glob_step = train(train_loader, pos2mot_model, criterion,
-                                                                        optimizer,
-                                                                        device, config.lr, lr_now, glob_step,
+                                                                        optimizer, device, config.lr, lr_now, glob_step,
                                                                         config.lr_decay, config.lr_gamma,
                                                                         refine_model=refine_model,
                                                                         refine_iteration=config.refine_iteration,
                                                                         pos_loss_on=config.pos_loss_on,
                                                                         mot_loss_on=config.mot_loss_on,
-                                                                        step_lr=config.lr_schedule == 'step')
+                                                                        step_lr=config.lr_schedule == 'step',
+                                                                        include_lie_repr=config.include_lie_repr)
 
             # Evaluate
             # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
             errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
-                              refine_model=refine_model, refine_iteration=config.refine_iteration)
+                              refine_model=refine_model, refine_iteration=config.refine_iteration,
+                              include_lie_repr=config.include_lie_repr)
 
             if evaluate_motion:
                 errors = list(errors)
                 errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
-                                         refine_model=refine_model, refine_iteration=config.refine_iteration)
+                                         refine_model=refine_model, refine_iteration=config.refine_iteration,
+                                         include_lie_repr=config.include_lie_repr)
                 for i in range(2, len(errors)):
                     errors[i] = errors_motion[i]
 

@@ -7,7 +7,8 @@ import torch.nn as nn
 class TrajRefinementModule(nn.Module):
     def __init__(self, ipt_dim, opt_dim,
                  hid_dim=128, n_layers=1, bidirectional=False,
-                 dropout_ratio=0.5, size=(64, 28, 45)):
+                 dropout_ratio=0.5, size=(64, 28, 45),
+                 include_lie_repr=False):
         super(TrajRefinementModule, self).__init__()
         # config
         self.ipt_dim = ipt_dim
@@ -19,18 +20,30 @@ class TrajRefinementModule(nn.Module):
         hid_dim_factor = 2 if self.bidirectional else 1
 
         # layers
-        self.pre_rnn = nn.Sequential(
-            nn.Linear(self.ipt_dim, self.hid_dim // 2),
-            nn.ReLU(),
-            nn.Linear(self.hid_dim // 2, self.hid_dim)
-        )
+        # layers
+        if include_lie_repr:
+            print('Large Refinement!!')
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim, self.hid_dim * 2)
+            )
 
-        self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
-                          bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+            self.rnn = nn.GRU(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+        else:
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim // 2),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim // 2, self.hid_dim)
+            )
 
-        self.post_rnn = nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
+            self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
 
     def forward(self, x):
+        print(x.size())
+        print(self.pre_rnn)
         x = self.pre_rnn(x)
         x, hidden = self.rnn(x)
         x = self.post_rnn(x)
@@ -40,7 +53,8 @@ class TrajRefinementModule(nn.Module):
 class ResTrajRefinementModule(nn.Module):
     def __init__(self, ipt_dim, opt_dim,
                  hid_dim=128, n_layers=1, bidirectional=False,
-                 dropout_ratio=0.5, size=(64, 28, 45)):
+                 dropout_ratio=0.5, size=(64, 28, 45),
+                 include_lie_repr=False):
         super(ResTrajRefinementModule, self).__init__()
         # config
         self.ipt_dim = ipt_dim
@@ -52,18 +66,31 @@ class ResTrajRefinementModule(nn.Module):
         hid_dim_factor = 2 if self.bidirectional else 1
 
         # layers
-        self.pre_rnn = nn.Sequential(
-            nn.Linear(self.ipt_dim, self.hid_dim // 2),
-            nn.ReLU(),
-            nn.Linear(self.hid_dim // 2, self.hid_dim)
-        )
+        if include_lie_repr:
+            print('Large Refinement!!')
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim, self.hid_dim * 2)
+            )
 
-        self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
-                          bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+            self.rnn = nn.GRU(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+        else:
+            self.pre_rnn = nn.Sequential(
+                nn.Linear(self.ipt_dim, self.hid_dim // 2),
+                nn.ReLU(),
+                nn.Linear(self.hid_dim // 2, self.hid_dim)
+            )
+
+            self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
+                              bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
 
         self.post_rnn = nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
 
     def forward(self, x):
+        # print(x.size())
+        # print(self.pre_rnn)
         identity = x
         x = self.pre_rnn(x)
         x, hidden = self.rnn(x)

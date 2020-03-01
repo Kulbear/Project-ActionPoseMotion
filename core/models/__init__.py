@@ -1,6 +1,7 @@
 from .pose_motion_model import (
     PoseLifter,
     MotionGenerator,
+    MotionGeneratorLie,
     Pose2MotNet
 )
 
