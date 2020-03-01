@@ -1,5 +1,7 @@
 import torch
+import math
 import numpy as np
+import core.lie_utils as gu
 
 
 def mpjpe(predicted, target):
@@ -85,3 +87,58 @@ def mean_velocity_error(predicted, target):
     velocity_target = np.diff(target, axis=0)
 
     return np.mean(np.linalg.norm(velocity_predicted - velocity_target, axis=len(target.shape) - 1))
+
+
+'''
+predicted: numpy-array with size num_frames * num_joints * 6
+target: numpy-array with size num_frames * num_joints * 6
+output: numpy-array with size num_frames * 1
+'''
+
+
+def angle_metric(predicted, target):
+    target = np.reshape(target, (target.shape[0], -1, 6))
+    predicted = np.reshape(predicted, (target.shape[0], -1, 6))
+    nframes = target.shape[0]
+    njoints = target.shape[1]
+    angle_metric = np.zeros([nframes, 1])
+    for i in range(nframes):
+        for j in range(njoints):
+            R = np.dot(np.linalg.inv(gu.rotmat(target[i, j, 0:3])), gu.rotmat(predicted[i, j, 0:3]))
+            angle_metric[i] = angle_metric[i] + (np.arccos((np.trace(R) - 1) / 2)) ** 2
+    angle_metric = np.sqrt(angle_metric) / njoints
+    return angle_metric
+
+
+def euler_metric(predicted, target):
+    nframes = target.shape[0]
+    njoints = target.shape[1]
+    euler_metric = np.zeros([nframes, 1])
+    # target[:,0:6] = 0
+    # predicted[:,0:6] = 0
+    for i in range(nframes):
+        for j in range(3, 3, njoints):
+            gt_R = gu.rotmat(np.squeeze(target[i, j:j + 3]))
+            pred_R = gu.rotmat(np.squeeze(predicted[i, j:j + 3]))
+            euler_metric[i] = euler_metric[i] + np.sum(np.subtract(RotMat2Euler(gt_R), RotMat2Euler(pred_R))) ** 2
+    euler_metric = np.sqrt(euler_metric)
+    return euler_metric
+
+
+def RotMat2Euler(R):
+    if R[0, 2] == 1 or R[0, 2] == -1:
+        E3 = 0
+        dlta = np.arctan2(R[0, 1], R[0, 2])
+        if R[0, 2] == -1:
+            E2 = np.pi / 2
+            E1 = E3 + dlta
+        else:
+            E2 = -np.pi / 2
+            E1 = -E3 + dlta
+    else:
+        E2 = - np.arcsin(R[0, 2])
+        E1 = np.arctan2(R[1, 2] / np.cos(E2), R[2, 2] / np.cos(E2))
+        E3 = np.arctan2(R[0, 1] / np.cos(E2), R[0, 0] / np.cos(E2))
+
+    Eul = [-E1, -E2, -E3]
+    return Eul
