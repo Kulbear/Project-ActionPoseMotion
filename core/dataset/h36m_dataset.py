@@ -1,7 +1,7 @@
 import copy
 import numpy as np
-from core.data.skeleton import Skeleton
-from core.data.mocap_dataset import MocapDataset
+from core.dataset.skeleton import Skeleton
+from core.dataset.mocap_dataset import MocapDataset
 from core.transforms import normalize_screen_coordinates
 
 h36m_skeleton = Skeleton(parents=[-1, 0, 1, 2, 3, 4, 0, 6, 7, 8, 9, 0, 11, 12, 13, 14, 12,
@@ -11,7 +11,7 @@ h36m_skeleton = Skeleton(parents=[-1, 0, 1, 2, 3, 4, 0, 6, 7, 8, 9, 0, 11, 12, 1
 
 h36m_skeleton_joints_group = [[2, 3], [5, 6], [1, 4], [0, 7], [8, 9], [14, 15], [11, 12], [10, 13]]
 
-# Joints in H3.6M -- data has 32 joints, but only 17 that move; these are the indices.
+# Joints in H3.6M -- dataset has 32 joints, but only 17 that move; these are the indices.
 H36M_NAMES = [''] * 32
 H36M_NAMES[0] = 'Hip'
 H36M_NAMES[1] = 'RHip'

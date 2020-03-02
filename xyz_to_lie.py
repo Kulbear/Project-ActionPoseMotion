@@ -50,9 +50,9 @@ def convert(joint_xyz):
 def main(config):
     if config.dataset == 'h36m':
         DATASET_NAME = config.dataset.lower()
-        dataset_path = Path('data', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
+        dataset_path = Path('dataset', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
         dataset = np.load(dataset_path, allow_pickle=True)['positions_3d'].item()
-        # joint_xyz = data['positions_3d'].item()['S1']['Walking 1']
+        # joint_xyz = dataset['positions_3d'].item()['S1']['Walking 1']
         lie_data = {'positions_lie': {}}
         for subject in dataset.keys():
             if subject not in lie_data['positions_lie'].keys():

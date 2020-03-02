@@ -43,7 +43,7 @@ def train(data_loader, pos2mot_model, criterion,
     # Epoch starts
     bar = Bar('Train', max=len(data_loader))
     for i, data in enumerate(data_loader):
-        # Measure data loading time
+        # Measure dataset loading time
         data_time.update(time.time() - end)
 
         # Adjust learning rate if decay condition is satisfied
@@ -51,7 +51,7 @@ def train(data_loader, pos2mot_model, criterion,
         if step_lr and step % decay == 0:
             lr_now = lr_decay(optimizer, step, lr_init, decay, gamma)
 
-        # Parse data
+        # Parse dataset
         pose_2d = data['pose_2d']
         pose_3d = data['pose_3d']
         pose_lie = data['pose_lie']
@@ -205,10 +205,10 @@ def evaluate(data_loader, pos2mot_model, device,
 
     bar = Bar('Eval ', max=len(data_loader))
     for i, data in enumerate(data_loader):
-        # Measure data loading time
+        # Measure dataset loading time
         data_time.update(time.time() - end)
 
-        # Parse data
+        # Parse dataset
         pose_2d = data['pose_2d']
         pose_3d = data['pose_3d']
         pose_lie = data['pose_lie']

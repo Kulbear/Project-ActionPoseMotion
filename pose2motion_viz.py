@@ -5,9 +5,9 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from core.visualization import render_animation
-from core.data.generators import PoseGenerator
+from core.dataset.generators import PoseGenerator
 from core.models import PoseLifter, MotionGenerator, Pose2MotNet
-from core.data.data_utils import fetch_inference, read_3d_data, create_2d_data
+from core.dataset.data_utils import fetch_inference, read_3d_data, create_2d_data
 
 from pose2motion_arguments import parse_args
 from pose2motion_utils import evaluate
@@ -21,21 +21,21 @@ def main(config):
     print('==> Loading dataset...', config.dataset)
     if config.dataset == 'h36m':
         DATASET_NAME = config.dataset.lower()
-        from core.data.h36m_dataset import Human36mDataset, TRAIN_SUBJECTS, TEST_SUBJECTS
+        from core.dataset.h36m_dataset import Human36mDataset, TRAIN_SUBJECTS, TEST_SUBJECTS
 
-        dataset_path = Path('data', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
+        dataset_path = Path('dataset', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
         dataset = Human36mDataset(dataset_path)
     else:
         raise KeyError('Invalid dataset')
 
-    print('==> Preparing data...')
+    print('==> Preparing dataset...')
     dataset = read_3d_data(dataset)
-    keypoints_path = Path('data', DATASET_NAME, f'data_2d_{DATASET_NAME}_{config.keypoint_source}.npz')
+    keypoints_path = Path('dataset', DATASET_NAME, f'data_2d_{DATASET_NAME}_{config.keypoint_source}.npz')
     # keypoints[subject][action][cam_idx]
     keypoints = create_2d_data(keypoints_path, dataset)
 
     print('==> Initializing dataloaders...')
-    # pose_2d_past_segments, pose_3d_past_segments, pose_3d_future_segments, pose_actions = data
+    # pose_2d_past_segments, pose_3d_past_segments, pose_3d_future_segments, pose_actions = dataset
     data = fetch_inference(config.viz_subject, dataset, keypoints,
                            past=config.past, future=config.future,
                            action=config.viz_action, camera_idx=config.viz_camera,
