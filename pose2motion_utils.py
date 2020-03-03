@@ -20,7 +20,7 @@ def train(data_loader, pos2mot_model, criterion,
           step, decay, gamma, max_norm=True,
           refine_model=None, refine_iteration=1,
           pos_loss_on=True, mot_loss_on=True, step_lr=True,
-          include_lie_repr=False):
+          include_lie_repr=False, lie_weight=1):
     # Whether do refinement?
     with_refinement = refine_model is not None and refine_iteration > 0
 
@@ -131,7 +131,7 @@ def train(data_loader, pos2mot_model, criterion,
                 loss_lie_pose = criterion(pred_pose_lie.view(batch * seq_len, opt_dim * 2),
                                           pose_lie.view(batch * seq_len, opt_dim * 2))
                 mloss_lie_pose.update(loss_lie_pose.item(), batch * seq_len)
-                loss_3d += loss_lie_pose
+                loss_3d += loss_lie_pose * lie_weight
             total_seq_len += seq_len
 
         # Add motion loss
@@ -144,7 +144,7 @@ def train(data_loader, pos2mot_model, criterion,
                 loss_lie_motion = criterion(pred_motion_lie.view(batch * future_seq_len, opt_dim * 2),
                                             motion_gt_lie.view(batch * future_seq_len, opt_dim * 2))
                 mloss_lie_motion.update(loss_lie_motion.item(), batch * future_seq_len)
-                loss_3d += loss_lie_motion
+                loss_3d += loss_lie_motion * lie_weight
             total_seq_len += future_seq_len
 
         # Add refined loss
@@ -167,8 +167,12 @@ def train(data_loader, pos2mot_model, criterion,
 
         if pos_loss_on:
             bar.suffix += f'| LPos: {mloss_3d_pose.avg: .5f} '
+            if include_lie_repr:
+                bar.suffix += f'| LPosL: {mloss_lie_pose.avg: .5f} '
         if mot_loss_on:
-            bar.suffix += f'| LMot: {mloss_3d_motion.avg: .6f}'
+            bar.suffix += f'| LMot: {mloss_3d_motion.avg: .5f}'
+            if include_lie_repr:
+                bar.suffix += f'| LMotL: {mloss_lie_motion.avg: .5f} '
         if with_refinement:
             bar.suffix += f'| rLPos: {rloss_3d.avg: .5f} |'
         bar.next()

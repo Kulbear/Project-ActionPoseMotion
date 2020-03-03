@@ -104,7 +104,7 @@ def fetch(subjects, dataset, keypoints,
     # TODO: load lie_dataset from local or just load it directly
     lie_name = 'train_data_lie.pkl' if train else 'valid_data_lie.pkl'
     try:
-        lie_dataset = pickle.load(open(Path('dataset/h36m/', lie_name), 'rb'))
+        lie_dataset = pickle.load(open(Path('data/h36m/', lie_name), 'rb'))
         print('==> Found existing Lie repr!')
     except:
         print('==> No existing Lie repr, will create it online and save later.')

@@ -20,7 +20,7 @@ from .helpers import WritelnMixin
 
 
 class Bar(WritelnMixin, Progress):
-    width = 32
+    width = 10
     message = ''
     suffix = '%(index)d/%(max)d'
     bar_prefix = ' |'

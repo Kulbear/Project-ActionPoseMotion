@@ -45,7 +45,7 @@ def main(config):
         DATASET_NAME = config.dataset.lower()
         from core.dataset.h36m_dataset import Human36mDataset, TRAIN_SUBJECTS, TEST_SUBJECTS
 
-        dataset_path = Path('dataset', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
+        dataset_path = Path('data', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
         dataset = Human36mDataset(dataset_path)
         subjects_train = TRAIN_SUBJECTS
         subjects_test = TEST_SUBJECTS
@@ -64,7 +64,7 @@ def main(config):
     # Normalize so that [0, w] is mapped to [-1, 1], while preserving the aspect ratio
     # results in screen (aka frame) coordinates
     print('==> Loading 2D detections...', end='\t')
-    keypoints_path = Path('dataset', DATASET_NAME, f'data_2d_{DATASET_NAME}_{config.keypoint_source}.npz')
+    keypoints_path = Path('data', DATASET_NAME, f'data_2d_{DATASET_NAME}_{config.keypoint_source}.npz')
     keypoints = create_2d_data(keypoints_path, dataset)
     print(keypoints.keys())
 
@@ -203,7 +203,8 @@ def main(config):
                                                                         pos_loss_on=config.pos_loss_on,
                                                                         mot_loss_on=config.mot_loss_on,
                                                                         step_lr=config.lr_schedule == 'step',
-                                                                        include_lie_repr=config.include_lie_repr)
+                                                                        include_lie_repr=config.include_lie_repr,
+                                                                        lie_weight=config.lie_weight)
 
             # Evaluate
             # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
