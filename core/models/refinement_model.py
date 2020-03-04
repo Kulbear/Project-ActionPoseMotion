@@ -40,10 +40,9 @@ class TrajRefinementModule(nn.Module):
 
             self.rnn = nn.GRU(self.hid_dim, self.hid_dim * 2, self.n_layers,
                               bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
+        self.post_rnn = nn.Linear(self.hid_dim * 2 * hid_dim_factor, self.opt_dim)
 
     def forward(self, x):
-        print(x.size())
-        print(self.pre_rnn)
         x = self.pre_rnn(x)
         x, hidden = self.rnn(x)
         x = self.post_rnn(x)

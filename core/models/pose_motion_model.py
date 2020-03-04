@@ -64,7 +64,7 @@ class MotionGenerator(nn.Module):
             self.rnn = nn.LSTM(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
                                bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
         else:
-            self.rnn = nn.LSTM(self.hid_dim * 2, self.hid_dim * 2, self.n_layers,
+            self.rnn = nn.LSTM(self.hid_dim, self.hid_dim * 2, self.n_layers,
                                bidirectional=self.bidirectional, dropout=self.dropout_ratio, batch_first=True)
 
         self.post_rnn = nn.Sequential(
@@ -151,7 +151,8 @@ class Pose2MotNet(nn.Module):
             # print(prediction['motion_3d'].size())
             # print(prediction['motion_lie'].size())
             outputs[:, t, :] = prediction['motion_3d'].squeeze()
-            outputs_lie[:, t, :] = prediction['motion_lie'].squeeze()
+            if self.include_lie_repr:
+                outputs_lie[:, t, :] = prediction['motion_lie'].squeeze()
             hidden = prediction['decoder_hidden']
 
             # decide next input by teacher forcing ratio

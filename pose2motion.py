@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from datetime import date
 
 import torch
 import torch.nn as nn
@@ -30,7 +31,10 @@ def main(config):
 
     if evaluate_motion:
         print('==> Evaluate motion!')
-    ckpt_dir_path = Path('experiments', config.exp_name)
+    exp_name = f'{config.dataset}-{config.keypoint_source}-p{config.past}-f{config.future}-' \
+               f'h{config.hid_dim}-ponly_{config.mot_loss_on}-rfv_{config.refine_version}-' \
+               f'lie_{config.include_lie_repr}-liew_{config.lie_weight}-{date.today().strftime("%b-%d-%Y")}'
+    ckpt_dir_path = Path('experiments', exp_name)
     print('==> Created checkpoint dir: {}'.format(ckpt_dir_path))
     if ckpt_dir_path.exists():
         print('==> Found existing checkpoint dir!')
@@ -108,9 +112,11 @@ def main(config):
     total_params = sum(p.numel() for p in pos2mot_model.parameters() if p.requires_grad)
     print('Pose model # params:', total_params)
 
-    RefineNet = REFINEMENT_ARCHS.get(config.refine_version, None)
-    if not RefineNet:
-        raise NotImplementedError('Unknown refinement architecture!')
+    try:
+        RefineNet = REFINEMENT_ARCHS.get(config.refine_version)
+    except:
+        RefineNet = REFINEMENT_ARCHS.get(1)
+        config.refine_iteration = 0
 
     if config.include_lie_repr:
         assert config.refine_version in (1, 2)
@@ -135,7 +141,7 @@ def main(config):
 
     criterion = nn.MSELoss().to(device)
     parameter_to_optim = []
-    if refine_model is not None:
+    if refine_model is not None and config.refine_iteration > 0:
         parameter_to_optim += list(refine_model.parameters())
     if config.pos_loss_on:
         parameter_to_optim += list(encoder.parameters())
@@ -171,90 +177,70 @@ def main(config):
         lr_now = config.lr
         start_epoch = 0
 
-    if config.evaluation:
-        if config.ckpt_path is not None:
-            errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
-                              refine_model=refine_model, refine_iteration=config.refine_iteration,
-                              include_lie_repr=config.include_lie_repr)
-            if evaluate_motion:
-                errors = list(errors)
-                errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
-                                         refine_model=refine_model, refine_iteration=config.refine_iteration,
-                                         include_lie_repr=config.include_lie_repr)
-                for i in range(2, len(errors)):
-                    errors[i] = errors_motion[i]
+    # Training starts here
+    for epoch in range(start_epoch, config.epochs):
+        print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr_now))
 
-            print(f'{config.actions} ==>',
-                  'MPJPE {:.3f} | P-MPJPE {:.3f} | Mot MPJPE {:.3f} | Mot P-MPJPE {:.3f} |'.format(*errors))
-        else:
-            raise NotImplementedError('Cannot evaluate performance without loading a trained model!')
+        # Train for one epoch
+        [epoch_loss, epoch_loss_mot, *_], lr_now, glob_step = train(train_loader, pos2mot_model, criterion,
+                                                                    optimizer, device, config.lr, lr_now, glob_step,
+                                                                    config.lr_decay, config.lr_gamma,
+                                                                    refine_model=refine_model,
+                                                                    refine_iteration=config.refine_iteration,
+                                                                    pos_loss_on=config.pos_loss_on,
+                                                                    mot_loss_on=config.mot_loss_on,
+                                                                    step_lr=config.lr_schedule == 'step',
+                                                                    include_lie_repr=config.include_lie_repr,
+                                                                    lie_weight=config.lie_weight)
 
-    else:
-        # Training starts here
-        for epoch in range(start_epoch, config.epochs):
-            print('\nEpoch: %d | LR: %.8f' % (epoch + 1, lr_now))
+        # Evaluate
+        # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
+        errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
+                          refine_model=refine_model, refine_iteration=config.refine_iteration,
+                          include_lie_repr=config.include_lie_repr)
 
-            # Train for one epoch
-            [epoch_loss, epoch_loss_mot, *_], lr_now, glob_step = train(train_loader, pos2mot_model, criterion,
-                                                                        optimizer, device, config.lr, lr_now, glob_step,
-                                                                        config.lr_decay, config.lr_gamma,
-                                                                        refine_model=refine_model,
-                                                                        refine_iteration=config.refine_iteration,
-                                                                        pos_loss_on=config.pos_loss_on,
-                                                                        mot_loss_on=config.mot_loss_on,
-                                                                        step_lr=config.lr_schedule == 'step',
-                                                                        include_lie_repr=config.include_lie_repr,
-                                                                        lie_weight=config.lie_weight)
+        if evaluate_motion:
+            errors = list(errors)
+            errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
+                                     refine_model=refine_model, refine_iteration=config.refine_iteration,
+                                     include_lie_repr=config.include_lie_repr)
+            for i in range(2, len(errors)):
+                errors[i] = errors_motion[i]
 
-            # Evaluate
-            # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
-            errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
-                              refine_model=refine_model, refine_iteration=config.refine_iteration,
-                              include_lie_repr=config.include_lie_repr)
+        if config.lr_schedule == 'reduce':
+            if config.primary_target == 'pose':
+                lr_sch.step(errors[0])
+            elif config.primary_target == 'motion':
+                lr_sch.step(errors[2])
+            else:
+                raise NotImplementedError('Primary target has to be set as "pose" or "motion"!')
 
-            if evaluate_motion:
-                errors = list(errors)
-                errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
-                                         refine_model=refine_model, refine_iteration=config.refine_iteration,
-                                         include_lie_repr=config.include_lie_repr)
-                for i in range(2, len(errors)):
-                    errors[i] = errors_motion[i]
+        # Update log file
+        logger.append([epoch + 1, glob_step, lr_now, epoch_loss, *errors])
 
-            if config.lr_schedule == 'reduce':
-                if config.primary_target == 'pose':
-                    lr_sch.step(errors[0])
-                elif config.primary_target == 'motion':
-                    lr_sch.step(errors[2])
-                else:
-                    raise NotImplementedError('Primary target has to be set as "pose" or "motion"!')
+        # Save checkpoint
+        state = {
+            'epoch': epoch + 1, 'lr': lr_now, 'step': glob_step,
+            'pos2mot_model': pos2mot_model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'refine_model': refine_model.state_dict(),
+            'error_best_pose': error_best_pose,
+            'error_best_motion': error_best_motion
+        }
 
-            # Update log file
-            logger.append([epoch + 1, glob_step, lr_now, epoch_loss, *errors])
+        if error_best_pose is None or error_best_pose > errors[0]:
+            error_best_pose = errors[0]
+            suffix = 'pose_best'
+            save_ckpt(state, ckpt_dir_path, suffix=suffix)
 
-            # Save checkpoint
-            state = {
-                'epoch': epoch + 1, 'lr': lr_now, 'step': glob_step,
-                'pos2mot_model': pos2mot_model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'refine_model': refine_model.state_dict(),
-                'error_best_pose': error_best_pose,
-                'error_best_motion': error_best_motion
-            }
+        if error_best_motion is None or error_best_motion > errors[2]:
+            error_best_motion = errors[2]
+            suffix = 'motion_best'
+            save_ckpt(state, ckpt_dir_path, suffix=suffix)
 
-            if error_best_pose is None or error_best_pose > errors[0]:
-                error_best_pose = errors[0]
-                suffix = 'pose_best'
-                save_ckpt(state, ckpt_dir_path, suffix=suffix)
-
-            if error_best_motion is None or error_best_motion > errors[2]:
-                error_best_motion = errors[2]
-                suffix = 'motion_best'
-                save_ckpt(state, ckpt_dir_path, suffix=suffix)
-
-        logger.close()
-        logger.plot(['Pose MPJPE', 'Pose P-MPJPE', 'Motion MPJPE', 'Motion P-MPJPE'])
-        save_fig(Path(ckpt_dir_path, 'log.eps'))
-
+    # logger.plot(['Pose MPJPE', 'Pose P-MPJPE', 'Motion MPJPE', 'Motion P-MPJPE'])
+    # save_fig(Path(ckpt_dir_path, 'log.eps'))
+    logger.close()
 
 if __name__ == '__main__':
     config = parse_args()
