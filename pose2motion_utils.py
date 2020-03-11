@@ -20,7 +20,7 @@ def train(data_loader, pos2mot_model, criterion,
           step, decay, gamma, max_norm=True,
           refine_model=None, refine_iteration=1,
           pos_loss_on=True, mot_loss_on=True, step_lr=True,
-          include_lie_repr=False, lie_weight=1):
+          use_lie_algebra=False, lie_weight=1):
     # Whether do refinement?
     with_refinement = refine_model is not None and refine_iteration > 0
 
@@ -69,7 +69,7 @@ def train(data_loader, pos2mot_model, criterion,
         motion_gt_lie = motion_gt_lie[:, :, 1:, :].to(device).view(batch, future_seq_len, -1)
 
         # Forward pass
-        if include_lie_repr:
+        if use_lie_algebra:
             pred = pos2mot_model(pose_2d, motion_gt, gt_lie=motion_gt_lie,
                                  pos_loss_on=True, mot_loss_on=True)
             pred_pose_lie = pred['past_pose_lie']
@@ -81,7 +81,7 @@ def train(data_loader, pos2mot_model, criterion,
 
         # Multi-stage refinement module
         refined_loss = 0
-        if with_refinement and include_lie_repr:
+        if with_refinement and use_lie_algebra:
             traj = []
             traj_gt = []
             if pos_loss_on:
@@ -97,7 +97,7 @@ def train(data_loader, pos2mot_model, criterion,
                 refined_pred = torch.cat(traj, 1)
                 refined_gt = torch.cat(traj_gt, 1)
 
-        elif with_refinement and not include_lie_repr:
+        elif with_refinement and not use_lie_algebra:
             traj = []
             traj_gt = []
             if pos_loss_on:
@@ -127,7 +127,7 @@ def train(data_loader, pos2mot_model, criterion,
                                      pose_3d.view(batch * seq_len, opt_dim))
             mloss_3d_pose.update(loss_3d_pose.item(), batch * seq_len)
             loss_3d += loss_3d_pose
-            if include_lie_repr:
+            if use_lie_algebra:
                 loss_lie_pose = criterion(pred_pose_lie.view(batch * seq_len, opt_dim * 2),
                                           pose_lie.view(batch * seq_len, opt_dim * 2))
                 mloss_lie_pose.update(loss_lie_pose.item(), batch * seq_len)
@@ -140,7 +140,7 @@ def train(data_loader, pos2mot_model, criterion,
                                        motion_gt.view(batch * future_seq_len, opt_dim))
             loss_3d += loss_3d_motion
             mloss_3d_motion.update(loss_3d_motion.item(), batch * future_seq_len)
-            if include_lie_repr:
+            if use_lie_algebra:
                 loss_lie_motion = criterion(pred_motion_lie.view(batch * future_seq_len, opt_dim * 2),
                                             motion_gt_lie.view(batch * future_seq_len, opt_dim * 2))
                 mloss_lie_motion.update(loss_lie_motion.item(), batch * future_seq_len)
@@ -167,11 +167,11 @@ def train(data_loader, pos2mot_model, criterion,
 
         if pos_loss_on:
             bar.suffix += f'| LPos: {mloss_3d_pose.avg: .5f} '
-            if include_lie_repr:
+            if use_lie_algebra:
                 bar.suffix += f'| LPosL: {mloss_lie_pose.avg: .5f} '
         if mot_loss_on:
             bar.suffix += f'| LMot: {mloss_3d_motion.avg: .5f}'
-            if include_lie_repr:
+            if use_lie_algebra:
                 bar.suffix += f'| LMotL: {mloss_lie_motion.avg: .5f} '
         if with_refinement:
             bar.suffix += f'| rLPos: {rloss_3d.avg: .5f} |'
@@ -183,7 +183,7 @@ def train(data_loader, pos2mot_model, criterion,
 
 
 def evaluate(data_loader, pos2mot_model, device,
-             inference_mode=False, refine_model=None, refine_iteration=1, include_lie_repr=False):
+             inference_mode=False, refine_model=None, refine_iteration=1, use_lie_algebra=False):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     mpjpe_pose = AverageMeter()
@@ -232,7 +232,7 @@ def evaluate(data_loader, pos2mot_model, device,
                              teacher_forcing_ratio=0.)
 
         # Inference: refinement
-        if include_lie_repr:
+        if use_lie_algebra:
             past_pose = torch.cat((pred['past_pose'], pred['past_pose_lie']), dim=2)
             future_motion = torch.cat((pred['future_motion'], pred['future_motion_lie']), dim=2)
             refined_pred = torch.cat((past_pose, future_motion), 1)

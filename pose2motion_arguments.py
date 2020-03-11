@@ -30,8 +30,10 @@ def parse_args():
                         help='The number of workers used for the dataloader.')
 
     # model
+    parser.add_argument('-prfv', '--pre_refine_version', type=int, default=1,
+                        help='The pre-refine model version used.')
     parser.add_argument('-rfv', '--refine_version', type=int, default=1,
-                        help='The refine model version used.')
+                        help='The post-refine model version used.')
     parser.add_argument('-rfi', '--refine_iteration', type=int, default=1,
                         help="The number of refinement performed.")
     parser.add_argument('--encoder_ipt_dim', default=32, type=int,
@@ -54,7 +56,7 @@ def parse_args():
                         help='Whether to turn on pose loss.')
     parser.add_argument('--mot_loss_on', default=1, type=int,
                         help='Whether to turn on motion loss.')
-    parser.add_argument('--include_lie_repr', default=0, type=int,
+    parser.add_argument('--use_lie_algebra', default=0, type=int,
                         help='Whether to include lie representation.')
     parser.add_argument('--lie_weight', default=0, type=float,
                         help='The weight coefficient for the Lie loss.')

@@ -8,7 +8,7 @@ class TrajRefinementModule(nn.Module):
     def __init__(self, ipt_dim, opt_dim,
                  hid_dim=128, n_layers=1, bidirectional=False,
                  dropout_ratio=0.5, size=(64, 28, 45),
-                 include_lie_repr=False):
+                 use_lie_algebra=False):
         super(TrajRefinementModule, self).__init__()
         # config
         self.ipt_dim = ipt_dim
@@ -21,7 +21,7 @@ class TrajRefinementModule(nn.Module):
 
         # layers
         # layers
-        if include_lie_repr:
+        if use_lie_algebra:
             print('Large Refinement!!')
             self.pre_rnn = nn.Sequential(
                 nn.Linear(self.ipt_dim, self.hid_dim),
@@ -53,7 +53,7 @@ class ResTrajRefinementModule(nn.Module):
     def __init__(self, ipt_dim, opt_dim,
                  hid_dim=128, n_layers=1, bidirectional=False,
                  dropout_ratio=0.5, size=(64, 28, 45),
-                 include_lie_repr=False):
+                 use_lie_algebra=False):
         super(ResTrajRefinementModule, self).__init__()
         # config
         self.ipt_dim = ipt_dim
@@ -65,7 +65,7 @@ class ResTrajRefinementModule(nn.Module):
         hid_dim_factor = 2 if self.bidirectional else 1
 
         # layers
-        if include_lie_repr:
+        if use_lie_algebra:
             print('Large Refinement!!')
             self.pre_rnn = nn.Sequential(
                 nn.Linear(self.ipt_dim, self.hid_dim),

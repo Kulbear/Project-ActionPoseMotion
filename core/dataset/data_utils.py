@@ -145,9 +145,9 @@ def fetch(subjects, dataset, keypoints_gt, keypoints_dt, lie_dataset={},
 
             # ground-truth keypoints
             keypoints_2d_gt = keypoints_dt[subject][action]
-            for i in range(len(keypoints_2d)):  # Iterate across cameras
-                out_keypoints_2d_gt.append(keypoints_2d[i])
-                out_actions.append([action_type] * keypoints_2d[i].shape[0])
+            for i in range(len(keypoints_2d_gt)):  # Iterate across cameras
+                out_keypoints_2d_gt.append(keypoints_2d_gt[i])
+                out_actions.append([action_type] * keypoints_2d_gt[i].shape[0])
 
             if parse_3d_poses and 'positions_3d' in dataset[subject][action]:
                 poses_3d = dataset[subject][action]['positions_3d']
