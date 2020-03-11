@@ -47,7 +47,7 @@ def fetch_inference(subject, dataset, keypoints,
     if window_stride is None:
         window_stride = past
 
-    out_poses_3d = []
+    out_skeletons_3d = []
     out_poses_2d = []
     out_actions = []
     # Example: subject => S1, action => Walking 1
@@ -65,20 +65,20 @@ def fetch_inference(subject, dataset, keypoints,
         assert len(poses_3d) == len(poses_2d), 'Camera count mismatch'
         for i in range(len(poses_3d)):  # Iterate across cameras
             if i == camera_idx:
-                out_poses_3d.append(poses_3d[i])
+                out_skeletons_3d.append(poses_3d[i])
 
-    if len(out_poses_3d) == 0:
-        out_poses_3d = None
+    if len(out_skeletons_3d) == 0:
+        out_skeletons_3d = None
 
     if time_stride > 1:
         # Downsample as requested
         for i in range(len(out_poses_2d)):
             out_poses_2d[i] = out_poses_2d[i][::time_stride]
             out_actions[i] = out_actions[i][::time_stride]
-            if out_poses_3d is not None:
-                out_poses_3d[i] = out_poses_3d[i][::time_stride]
+            if out_skeletons_3d is not None:
+                out_skeletons_3d[i] = out_skeletons_3d[i][::time_stride]
 
-    # out_poses_3d, out_poses_2d, out_actions
+    # out_skeletons_3d, out_poses_2d, out_actions
     pose_2d_past_segments = []
     pose_3d_past_segments = []
     pose_3d_future_segments = []
@@ -88,13 +88,13 @@ def fetch_inference(subject, dataset, keypoints,
             for i in range(past, len(out_poses_2d[cam_idx]) - future, window_stride):
                 pose_2d_past_segments.append(out_poses_2d[cam_idx][i - past:i])
                 pose_actions.append(out_actions[cam_idx][i])
-                if out_poses_3d is not None:
-                    pose_3d_past_segments.append(out_poses_3d[cam_idx][i - past:i])
-                    pose_3d_future_segments.append(out_poses_3d[cam_idx][i:i + future])
+                if out_skeletons_3d is not None:
+                    pose_3d_past_segments.append(out_skeletons_3d[cam_idx][i - past:i])
+                    pose_3d_future_segments.append(out_skeletons_3d[cam_idx][i:i + future])
     return pose_2d_past_segments, pose_3d_past_segments, pose_3d_future_segments, pose_actions
 
 
-def fetch(subjects, dataset, keypoints,
+def fetch(subjects, dataset, keypoints_gt, keypoints_dt, lie_dataset={},
           past=8, future=16, window_stride=None,
           action_filter=None, time_stride=1, parse_3d_poses=True, train=True):
     # If not specified, use past size as the sliding window strides
@@ -108,20 +108,20 @@ def fetch(subjects, dataset, keypoints,
         print('==> Found existing Lie repr!')
     except:
         print('==> No existing Lie repr, will create it online and save later.')
-        lie_dataset = {}
 
     online_lie = False if lie_dataset else True
 
-    out_poses_3d = []
-    out_poses_2d = []
-    out_poses_lie = []
+    out_skeletons_3d = []
+    out_keypoints_2d_gt = []
+    out_keypoints_2d_dt = []
+    out_skeletons_lie = []
     out_actions = []
 
     for subject in subjects:
         print('==> Fetching subject:', subject)
         if online_lie:
             lie_dataset[subject] = {}
-        for action in keypoints[subject].keys():
+        for action in keypoints_gt[subject].keys():
             # print('==> Fetching video:', action)
             if online_lie:
                 lie_dataset[subject][action] = []
@@ -131,67 +131,76 @@ def fetch(subjects, dataset, keypoints,
             if action_filter is not None:
                 found = False
                 for a in action_filter:
-                    # if action.startswith(a):
-                    if action_type == a:
+                    if action.startswith(a):
                         found = True
                         break
                 if not found:
                     continue
 
-            poses_2d = keypoints[subject][action]
-            for i in range(len(poses_2d)):  # Iterate across cameras
-                out_poses_2d.append(poses_2d[i])
-                out_actions.append([action_type] * poses_2d[i].shape[0])
+            # detection keypoints
+            keypoints_2d = keypoints_gt[subject][action]
+            for i in range(len(keypoints_2d)):  # Iterate across cameras
+                out_keypoints_2d_dt.append(keypoints_2d[i])
+                out_actions.append([action_type] * keypoints_2d[i].shape[0])
+
+            # ground-truth keypoints
+            keypoints_2d_gt = keypoints_dt[subject][action]
+            for i in range(len(keypoints_2d)):  # Iterate across cameras
+                out_keypoints_2d_gt.append(keypoints_2d[i])
+                out_actions.append([action_type] * keypoints_2d[i].shape[0])
 
             if parse_3d_poses and 'positions_3d' in dataset[subject][action]:
                 poses_3d = dataset[subject][action]['positions_3d']
-                assert len(poses_3d) == len(poses_2d), 'Camera count mismatch'
+                assert len(poses_3d) == len(keypoints_2d), 'Camera count mismatch'
                 for i in range(len(poses_3d)):  # Iterate across cameras
-                    out_poses_3d.append(poses_3d[i])
+                    out_skeletons_3d.append(poses_3d[i])
                     if online_lie:
                         lie_repr = convert_to_lie(poses_3d[i])
                         lie_dataset[subject][action].append(lie_repr)
-                        out_poses_lie.append(lie_repr)
+                        out_skeletons_lie.append(lie_repr)
                     else:
-                        out_poses_lie.append(lie_dataset[subject][action][i])
+                        out_skeletons_lie.append(lie_dataset[subject][action][i])
 
-    if len(out_poses_3d) == 0:
-        out_poses_3d = None
-        out_poses_lie = None
+    if len(out_skeletons_3d) == 0:
+        out_skeletons_3d = None
+        out_skeletons_lie = None
 
     if online_lie:
         pickle.dump(lie_dataset, open(lie_name, 'wb'))
 
     if time_stride > 1:
         # Downsample as requested
-        for i in range(len(out_poses_2d)):
-            out_poses_2d[i] = out_poses_2d[i][::time_stride]
+        for i in range(len(out_keypoints_2d_dt)):
+            out_keypoints_2d_dt[i] = out_keypoints_2d_dt[i][::time_stride]
+            out_keypoints_2d_gt[i] = out_keypoints_2d_gt[i][::time_stride]
             out_actions[i] = out_actions[i][::time_stride]
-            if out_poses_3d is not None:
-                out_poses_3d[i] = out_poses_3d[i][::time_stride]
-            if out_poses_lie is not None:
-                out_poses_lie[i] = out_poses_lie[i][::time_stride]
+            if out_skeletons_3d is not None:
+                out_skeletons_3d[i] = out_skeletons_3d[i][::time_stride]
+            if out_skeletons_lie is not None:
+                out_skeletons_lie[i] = out_skeletons_lie[i][::time_stride]
 
-    # out_poses_3d, out_poses_2d, out_actions, out_poses_lie
+    # out_skeletons_3d, out_poses_2d, out_actions, out_skeletons_lie
     pose_2d_past_segments = []
+    pose_2d_past_gt_segments = []
     pose_3d_past_segments = []
     pose_3d_future_segments = []
     pose_lie_segments = []
     pose_lie_future_segments = []
     pose_actions = []
 
-    for cam_idx in range(len(out_poses_2d)):
-        for i in range(past, len(out_poses_2d[cam_idx]) - future, window_stride):
-            pose_2d_past_segments.append(out_poses_2d[cam_idx][i - past:i])
+    for cam_idx in range(len(out_keypoints_2d_dt)):
+        for i in range(past, len(out_keypoints_2d_dt[cam_idx]) - future, window_stride):
+            pose_2d_past_segments.append(out_keypoints_2d_dt[cam_idx][i - past:i])
+            pose_2d_past_gt_segments.append(out_keypoints_2d_gt[cam_idx][i - past:i])
             pose_actions.append(out_actions[cam_idx][i])
-            if out_poses_3d is not None:
-                pose_3d_past_segments.append(out_poses_3d[cam_idx][i - past:i])
-                pose_3d_future_segments.append(out_poses_3d[cam_idx][i:i + future])
-                pose_lie_segments.append(out_poses_lie[cam_idx][i - past:i])
-                pose_lie_future_segments.append(out_poses_lie[cam_idx][i:i + future])
+            if out_skeletons_3d is not None:
+                pose_3d_past_segments.append(out_skeletons_3d[cam_idx][i - past:i])
+                pose_3d_future_segments.append(out_skeletons_3d[cam_idx][i:i + future])
+                pose_lie_segments.append(out_skeletons_lie[cam_idx][i - past:i])
+                pose_lie_future_segments.append(out_skeletons_lie[cam_idx][i:i + future])
 
-    return (pose_2d_past_segments, pose_3d_past_segments,
-            pose_3d_future_segments,
+    return (pose_2d_past_segments, pose_2d_past_gt_segments,
+            pose_3d_past_segments, pose_3d_future_segments,
             pose_lie_segments, pose_lie_future_segments,
             pose_actions)
 
@@ -250,6 +259,7 @@ tensor([[ 0.0000,  0.0000,  0.0000],
         [-0.2071,  0.0626,  0.1444],
         [-0.2288,  0.0095, -0.1007]])
 '''
+
 
 # input tensor size (num_joint = 16, 6) output tensor size (num_joint = 16, 3)
 def lie_to_euler_h36m_hard_code(lie_parameters, lie_index=lie_index_h36m):
@@ -364,6 +374,8 @@ array([[[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
         [ 3.45872343e-01, -1.67232858e-01, -2.88497875e-01,
           2.51728743e-01,  0.00000000e+00,  0.00000000e+00]]])
 """
+
+
 # input numpy array size (time, num_joint, 3)
 # output numpy array size (time, num_joint, 6)
 def convert_to_lie(joint_xyz, lie_index=lie_index_h36m):
