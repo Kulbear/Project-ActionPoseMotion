@@ -138,16 +138,15 @@ def fetch(subjects, dataset, keypoints_gt, keypoints_dt, lie_dataset={},
                     continue
 
             # detection keypoints
-            keypoints_2d = keypoints_gt[subject][action]
+            keypoints_2d = keypoints_dt[subject][action]
             for i in range(len(keypoints_2d)):  # Iterate across cameras
                 out_keypoints_2d_dt.append(keypoints_2d[i])
                 out_actions.append([action_type] * keypoints_2d[i].shape[0])
 
             # ground-truth keypoints
-            keypoints_2d_gt = keypoints_dt[subject][action]
+            keypoints_2d_gt = keypoints_gt[subject][action]
             for i in range(len(keypoints_2d_gt)):  # Iterate across cameras
                 out_keypoints_2d_gt.append(keypoints_2d_gt[i])
-                out_actions.append([action_type] * keypoints_2d_gt[i].shape[0])
 
             if parse_3d_poses and 'positions_3d' in dataset[subject][action]:
                 poses_3d = dataset[subject][action]['positions_3d']
@@ -188,8 +187,8 @@ def fetch(subjects, dataset, keypoints_gt, keypoints_dt, lie_dataset={},
     pose_lie_future_segments = []
     pose_actions = []
 
-    for cam_idx in range(len(out_keypoints_2d_dt)):
-        for i in range(past, len(out_keypoints_2d_dt[cam_idx]) - future, window_stride):
+    for cam_idx in range(len(out_keypoints_2d_gt)):
+        for i in range(past, len(out_keypoints_2d_gt[cam_idx]) - future, window_stride):
             pose_2d_past_segments.append(out_keypoints_2d_dt[cam_idx][i - past:i])
             pose_2d_past_gt_segments.append(out_keypoints_2d_gt[cam_idx][i - past:i])
             pose_actions.append(out_actions[cam_idx][i])

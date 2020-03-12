@@ -12,14 +12,8 @@ from .refinement_model import (
 )
 
 from .keypoint_refinement import (
-    KeypointRefineNetV1,
-    KeypointRefineNetV2
+    KeypointRefineNet
 )
-
-PRE_REFINEMENT_ARCHS = {
-    1: KeypointRefineNetV1,
-    2: KeypointRefineNetV2
-}
 
 REFINEMENT_ARCHS = {
     1: TrajRefinementModule,

@@ -7,13 +7,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from core.log import Logger, save_fig, save_config
-from core.dataset.generators import PoseGenerator
+from core.dataset.generators2 import PoseGenerator
 from core.models import (
     PoseLifter, MotionGenerator,
     Pose2MotNet, REFINEMENT_ARCHS
 )
 from core.utils import save_ckpt, load_ckpt
-from core.dataset.data_utils import fetch, read_3d_data, create_2d_data
+from core.dataset.data_utils2 import fetch, read_3d_data, create_2d_data
 
 from pose2motion_arguments import parse_args
 from pose2motion_utils import train, evaluate
@@ -33,7 +33,9 @@ def main(config):
         print('==> Evaluate motion!')
     exp_name = f'{config.dataset}-{config.keypoint_source}-p{config.past}-f{config.future}-' \
                f'h{config.hid_dim}-ponly_{config.mot_loss_on}-rfv_{config.refine_version}-' \
-               f'lie_{config.include_lie_repr}-liew_{config.lie_weight}-{date.today().strftime("%b-%d-%Y")}'
+               f'lie_{config.use_lie_algebra}-liew_{config.lie_weight}-{date.today().strftime("%b-%d-%Y")}'
+    # if config.exp_prefix:
+    #     exp_name = config.exp_prefix + exp_name
     ckpt_dir_path = Path('experiments', exp_name)
     print('==> Created checkpoint dir: {}'.format(ckpt_dir_path))
     if ckpt_dir_path.exists():
@@ -102,29 +104,30 @@ def main(config):
     encoder = PoseLifter(config.encoder_ipt_dim, config.encoder_opt_dim,
                          hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
                          bidirectional=config.bidirectional, dropout_ratio=config.dropout,
-                         include_lie_repr=config.include_lie_repr)
+                         use_lie_algebra=config.use_lie_algebra)
     decoder = MotionGenerator(config.decoder_ipt_dim, config.decoder_opt_dim,
                               hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
                               bidirectional=config.bidirectional, dropout_ratio=config.dropout,
-                              include_lie_repr=config.include_lie_repr)
+                              use_lie_algebra=config.use_lie_algebra)
 
-    pos2mot_model = Pose2MotNet(encoder, decoder, include_lie_repr=config.include_lie_repr).to(device)
+    pos2mot_model = Pose2MotNet(encoder, decoder, use_lie_algebra=config.use_lie_algebra).to(device)
     total_params = sum(p.numel() for p in pos2mot_model.parameters() if p.requires_grad)
     print('Pose model # params:', total_params)
 
     try:
-        RefineNet = REFINEMENT_ARCHS.get(config.refine_version)
+        RefineNet = REFINEMENT_ARCHS[config.refine_version]
     except:
+        print('No Refinement!!')
         RefineNet = REFINEMENT_ARCHS.get(1)
         config.refine_iteration = 0
 
-    if config.include_lie_repr:
+    if config.use_lie_algebra:
         assert config.refine_version in (1, 2)
         refine_model = RefineNet(config.decoder_opt_dim * 3, config.decoder_opt_dim * 3,
                                  hid_dim=config.hid_dim, n_layers=config.num_recurrent_layers,
                                  bidirectional=config.bidirectional, dropout_ratio=config.dropout,
                                  size=(config.batch_size, config.past + config.future, config.decoder_opt_dim * 3),
-                                 include_lie_repr=config.include_lie_repr).to(device)
+                                 use_lie_algebra=config.use_lie_algebra).to(device)
         total_params = sum(p.numel() for p in refine_model.parameters() if p.requires_grad)
         print('Refine model # params:', total_params)
 
@@ -190,20 +193,20 @@ def main(config):
                                                                     pos_loss_on=config.pos_loss_on,
                                                                     mot_loss_on=config.mot_loss_on,
                                                                     step_lr=config.lr_schedule == 'step',
-                                                                    include_lie_repr=config.include_lie_repr,
+                                                                    use_lie_algebra=config.use_lie_algebra,
                                                                     lie_weight=config.lie_weight)
 
         # Evaluate
         # errors = [Pose MPJPE, Pose P-MPJPE, Motion MPJPE, Motion P-MPJPE]
         errors = evaluate(valid_loader_pose, pos2mot_model, device, inference_mode=False,
                           refine_model=refine_model, refine_iteration=config.refine_iteration,
-                          include_lie_repr=config.include_lie_repr)
+                          use_lie_algebra=config.use_lie_algebra)
 
         if evaluate_motion:
             errors = list(errors)
             errors_motion = evaluate(valid_loader_motion, pos2mot_model, device, inference_mode=False,
                                      refine_model=refine_model, refine_iteration=config.refine_iteration,
-                                     include_lie_repr=config.include_lie_repr)
+                                     use_lie_algebra=config.use_lie_algebra)
             for i in range(2, len(errors)):
                 errors[i] = errors_motion[i]
 
@@ -241,6 +244,7 @@ def main(config):
     # logger.plot(['Pose MPJPE', 'Pose P-MPJPE', 'Motion MPJPE', 'Motion P-MPJPE'])
     # save_fig(Path(ckpt_dir_path, 'log.eps'))
     logger.close()
+
 
 if __name__ == '__main__':
     config = parse_args()

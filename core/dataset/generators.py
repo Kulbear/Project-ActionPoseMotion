@@ -45,16 +45,16 @@ class PoseGenerator(Dataset):
         out_3d_future = torch.from_numpy(self._pose_3d_future[index]).float()
         out_lie = torch.from_numpy(self._pose_lie[index]).float()
         out_lie_future = torch.from_numpy(self._pose_future_lie[index]).float()
-
         return {
             'pose_2d': out_2d_past,
             'pose_2d_gt': out_2d_gt_past,
             'pose_3d': out_3d_past,
-            'future_pose_3d': out_3d_future,
             'pose_lie': out_lie,
+            'future_pose_3d': out_3d_future,
             'future_pose_lie': out_lie_future,
             'action_type': ACTION_INDEX_MAP[self._actions[index]]
         }
+
 
     def __len__(self):
         return len(self._actions)

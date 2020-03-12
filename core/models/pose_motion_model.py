@@ -83,10 +83,13 @@ class MotionGenerator(nn.Module):
     def plain_forward(self, x, hidden):
         identity = x
         x = self.pre_rnn(x)
-        x, hidden = self.rnn(x, hidden)
+        if hidden is not None:
+            x, hidden = self.rnn(x, hidden)
+        else:
+            x, hidden = self.rnn(x)
         x = self.post_rnn(x)
         x = x + identity
-        return {'motion_3d': x, 'motion_lie': x, 'decoder_hidden': hidden}
+        return {'motion_3d': x, 'decoder_hidden': hidden}
 
     def lie_forward(self, x, hidden):
         x, x_lie = x
@@ -95,7 +98,10 @@ class MotionGenerator(nn.Module):
         x = self.pre_rnn(x)
         x_lie = self.pre_rnn_lie(x_lie)
         rnn_ipt = torch.cat((x_lie, x), dim=2)
-        latent, hidden = self.rnn(rnn_ipt, hidden)
+        if hidden is not None:
+            latent, hidden = self.rnn(rnn_ipt, hidden)
+        else:
+            latent, hidden = self.rnn(rnn_ipt)
         x = self.post_rnn(latent)
         x = x + identity_x
         x_lie = self.post_rnn_lie(latent)
