@@ -19,7 +19,7 @@ def train(data_loader, pos2mot_model, criterion,
           optimizer, device, lr_init, lr_now,
           step, decay, gamma, max_norm=True,
           refine_model=None, refine_iteration=1,
-          pos_loss_on=True, mot_loss_on=True, step_lr=True,
+          pos_loss_on=True, train_motion_model=True, step_lr=True,
           use_lie_algebra=False, lie_weight=1):
     # Whether do refinement?
     with_refinement = refine_model is not None and refine_iteration > 0
@@ -71,11 +71,11 @@ def train(data_loader, pos2mot_model, criterion,
         # Forward pass
         if use_lie_algebra:
             pred = pos2mot_model(pose_2d, motion_gt, gt_lie=motion_gt_lie,
-                                 pos_loss_on=True, mot_loss_on=True)
+                                 pos_loss_on=True, train_motion_model=True)
             pred_pose_lie = pred['past_pose_lie']
             pred_motion_lie = pred['future_motion_lie']
         else:
-            pred = pos2mot_model(pose_2d, motion_gt, pos_loss_on=True, mot_loss_on=True)
+            pred = pos2mot_model(pose_2d, motion_gt, pos_loss_on=True, train_motion_model=True)
         pred_pose_3d = pred['past_pose']
         pred_motion_3d = pred['future_motion']
 
@@ -87,7 +87,7 @@ def train(data_loader, pos2mot_model, criterion,
             if pos_loss_on:
                 traj.append(torch.cat((pred_pose_3d, pred_pose_lie), dim=2))
                 traj_gt.append(torch.cat((pose_3d, pose_lie), dim=2))
-            if mot_loss_on:
+            if train_motion_model:
                 traj.append(torch.cat((pred_motion_3d, pred_motion_lie), dim=2))
                 traj_gt.append(torch.cat((motion_gt, motion_gt_lie), dim=2))
             if len(traj) == 1:
@@ -103,7 +103,7 @@ def train(data_loader, pos2mot_model, criterion,
             if pos_loss_on:
                 traj.append(pred_pose_3d)
                 traj_gt.append(pose_3d)
-            if mot_loss_on:
+            if train_motion_model:
                 traj.append(pred_motion_3d)
                 traj_gt.append(motion_gt)
             if len(traj) == 1:
@@ -135,7 +135,7 @@ def train(data_loader, pos2mot_model, criterion,
             total_seq_len += seq_len
 
         # Add motion loss
-        if mot_loss_on:
+        if train_motion_model:
             loss_3d_motion = criterion(pred_motion_3d.view(batch * future_seq_len, opt_dim),
                                        motion_gt.view(batch * future_seq_len, opt_dim))
             loss_3d += loss_3d_motion
@@ -169,7 +169,7 @@ def train(data_loader, pos2mot_model, criterion,
             bar.suffix += f'| LPos: {mloss_3d_pose.avg: .5f} '
             if use_lie_algebra:
                 bar.suffix += f'| LPosL: {mloss_lie_pose.avg: .5f} '
-        if mot_loss_on:
+        if train_motion_model:
             bar.suffix += f'| LMot: {mloss_3d_motion.avg: .5f}'
             if use_lie_algebra:
                 bar.suffix += f'| LMotL: {mloss_lie_motion.avg: .5f} '

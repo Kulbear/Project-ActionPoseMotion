@@ -2,6 +2,41 @@ import torch
 import torch.nn as nn
 
 
+class KeypointRefineNet(nn.Module):
+    def __init__(self, ipt_dim, opt_dim,
+                 hid_dim=128, n_layers=1, bidirectional=False):
+        super(KeypointRefineNet, self).__init__()
+        # config
+        self.ipt_dim = ipt_dim
+        self.hid_dim = hid_dim
+        self.opt_dim = opt_dim
+        self.n_layers = n_layers
+        self.bidirectional = bidirectional
+        hid_dim_factor = 2 if self.bidirectional else 1
+
+        self.pre_rnn = nn.Sequential(
+            nn.Linear(self.ipt_dim, self.hid_dim // 4),
+            nn.ReLU(),
+            nn.Dropout(p=0.25),
+            nn.Linear(self.hid_dim // 4, self.hid_dim // 4),
+            nn.ReLU(),
+            nn.Dropout(p=0.25),
+        )
+
+        self.rnn = nn.GRU(self.hid_dim // 4, self.hid_dim // 4, self.n_layers,
+                          bidirectional=self.bidirectional, batch_first=True)
+
+        self.post_rnn = nn.Linear(self.hid_dim // 4 * hid_dim_factor, self.opt_dim)
+
+    def forward(self, x):
+        identity = x
+        x = self.pre_rnn(x)
+        x, hidden = self.rnn(x)
+        x = self.post_rnn(x)
+        x = x + identity
+        return {'refined_2d': x}
+
+
 class PoseLifter(nn.Module):
     def __init__(self, ipt_dim, opt_dim, hid_dim=128,
                  n_layers=1, bidirectional=False, dropout_ratio=0.5,
@@ -116,17 +151,19 @@ class MotionGenerator(nn.Module):
 
 
 class Pose2MotNet2D(nn.Module):
-    def __init__(self, encoder, decoder, refiner_2d=None, device='cuda', use_lie_algebra=False):
+    def __init__(self, encoder, decoder, kp_refiner=None, global_refiner=None,
+                 device='cuda', metadata={}):
         super(Pose2MotNet2D, self).__init__()
-        self.refiner_2d = refiner_2d
+        self.kp_refiner = kp_refiner
         self.encoder = encoder
         self.decoder = decoder
+        self.global_refiner = global_refiner
         self.device = device
-        self.use_lie_algebra = use_lie_algebra
+        self.use_lie_algebra = metadata.get('use_lie_algebra', False)
 
     def forward(self, x, gt, gt_lie=None,
                 teacher_forcing_ratio=0.5,
-                pos_loss_on=True, mot_loss_on=True):
+                pos_loss_on=True, train_motion_model=True):
         batch_size, seq_len = gt.size()[:2]
         outputs = torch.zeros(batch_size, seq_len, self.decoder.opt_dim).to(self.device)
         outputs_lie = torch.zeros(batch_size, seq_len, self.decoder.opt_dim * 2).to(self.device)
@@ -135,7 +172,7 @@ class Pose2MotNet2D(nn.Module):
         past_pose_sequence = encoder_output['pose_3d']
         hidden = encoder_output['encoder_hidden']
         past_pose_lie_sequence = encoder_output.get('pose_lie', None)
-        if not mot_loss_on:
+        if not train_motion_model:
             return {
                 'past_pose': past_pose_sequence,
                 'past_pose_lie': past_pose_lie_sequence,
@@ -201,7 +238,7 @@ class Pose2MotNet(nn.Module):
 
     def forward(self, x, gt, gt_lie=None,
                 teacher_forcing_ratio=0.5,
-                pos_loss_on=True, mot_loss_on=True):
+                pos_loss_on=True, train_motion_model=True):
         batch_size, seq_len = gt.size()[:2]
         outputs = torch.zeros(batch_size, seq_len, self.decoder.opt_dim).to(self.device)
         outputs_lie = torch.zeros(batch_size, seq_len, self.decoder.opt_dim * 2).to(self.device)
@@ -210,7 +247,7 @@ class Pose2MotNet(nn.Module):
         past_pose_sequence = encoder_output['pose_3d']
         hidden = encoder_output['encoder_hidden']
         past_pose_lie_sequence = encoder_output.get('pose_lie', None)
-        if not mot_loss_on:
+        if not train_motion_model:
             return {
                 'past_pose': past_pose_sequence,
                 'past_pose_lie': past_pose_lie_sequence,

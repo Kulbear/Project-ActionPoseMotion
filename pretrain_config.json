@@ -1,0 +1,29 @@
+{
+  "final": 0,
+  "dataset": "h36m",
+  "keypoint_source": "sh_ft",
+  "actions": "*",
+  "past": 54,
+  "future": 27,
+  "time_stride": 2,
+  "window_stride": 4,
+  "batch_size": 32,
+  "num_workers": 4,
+  "encoder_ipt_dim": 32,
+  "encoder_opt_dim": 45,
+  "decoder_ipt_dim": 45,
+  "decoder_opt_dim": 45,
+  "hid_dim": 512,
+  "num_recurrent_layers": 2,
+  "bidirectional": true,
+  "dropout": 0.3,
+  "use_lie_algebra": 0,
+  "visible_devices": "0",
+  "device": "cuda",
+  "lr": 0.001,
+  "pretrain_on": {
+    "train_pre_refiner": 4,
+    "train_pose_lifter": 24,
+    "train_motion_generator": 8
+  }
+}

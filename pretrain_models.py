@@ -2,21 +2,16 @@ import os
 
 import pickle
 from pathlib import Path
-from datetime import date
 
-import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from core.log import Logger, save_config
 from core.dataset.generators import PoseGenerator
 from core.models import (
     PoseLifter, MotionGenerator,
-    Pose2MotNet, REFINEMENT_ARCHS, KeypointRefineNet
+    KeypointRefineNet
 )
 from core.dataset.data_utils import fetch, read_3d_data, create_2d_data
 
-from pose2motion_arguments import parse_args
 from pretrain_utils import *
 from core.utils import save_ckpt
 
@@ -34,6 +29,11 @@ def main(config):
         dataset = Human36mDataset(dataset_path)
         subjects_train = TRAIN_SUBJECTS
         subjects_test = TEST_SUBJECTS
+    elif config.dataset == 'humanevaI':
+        DATASET_NAME = config.dataset.lower()
+        dataset_path = Path('data', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
+
+        raise NotImplementedError('Haven\'t done HumanEva-I!')
     else:
         raise KeyError('Invalid dataset')
 
@@ -169,7 +169,7 @@ def main(config):
         'decoder': decoder,
         'optimizer': optimizer.state_dict(),
     }
-    save_ckpt(state, '.', suffix=f'pretrain_lie{config.use_lie_algebra}')
+    save_ckpt(state, '.', suffix=f'test_pretrain_lie{config.use_lie_algebra}')
 
 
 if __name__ == '__main__':

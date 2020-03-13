@@ -54,7 +54,7 @@ def parse_args():
                         help='Dropout rate used in all dropout layers.')
     parser.add_argument('--pos_loss_on', default=1, type=int,
                         help='Whether to turn on pose loss.')
-    parser.add_argument('--mot_loss_on', default=1, type=int,
+    parser.add_argument('--train_motion_model', default=1, type=int,
                         help='Whether to turn on motion loss.')
     parser.add_argument('--use_lie_algebra', default=0, type=int,
                         help='Whether to include lie representation.')

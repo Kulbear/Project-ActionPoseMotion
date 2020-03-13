@@ -117,7 +117,8 @@ def euler_metric(predicted, target):
     # target[:,0:6] = 0
     # predicted[:,0:6] = 0
     for i in range(nframes):
-        for j in range(3, 3, njoints):
+        for j in range(3, njoints, 3):
+            print(i, j)
             gt_R = gu.rotmat(np.squeeze(target[i, j:j + 3]))
             pred_R = gu.rotmat(np.squeeze(predicted[i, j:j + 3]))
             euler_metric[i] = euler_metric[i] + np.sum(np.subtract(RotMat2Euler(gt_R), RotMat2Euler(pred_R))) ** 2
@@ -126,19 +127,19 @@ def euler_metric(predicted, target):
 
 
 def RotMat2Euler(R):
-    if R[0, 2] == 1 or R[0, 2] == -1:
+    if R[0][2] == 1 or R[0][2] == -1:
         E3 = 0
-        dlta = np.arctan2(R[0, 1], R[0, 2])
-        if R[0, 2] == -1:
+        dlta = np.arctan2(R[0][1], R[0][2])
+        if R[0][2] == -1:
             E2 = np.pi / 2
             E1 = E3 + dlta
         else:
             E2 = -np.pi / 2
             E1 = -E3 + dlta
     else:
-        E2 = - np.arcsin(R[0, 2])
-        E1 = np.arctan2(R[1, 2] / np.cos(E2), R[2, 2] / np.cos(E2))
-        E3 = np.arctan2(R[0, 1] / np.cos(E2), R[0, 0] / np.cos(E2))
+        E2 = - np.arcsin(R[0][2])
+        E1 = np.arctan2(R[1][2] / np.cos(E2), R[2][2] / np.cos(E2))
+        E3 = np.arctan2(R[0][1] / np.cos(E2), R[0][0] / np.cos(E2))
 
     Eul = [-E1, -E2, -E3]
     return Eul

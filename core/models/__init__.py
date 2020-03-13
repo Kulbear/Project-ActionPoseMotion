@@ -1,4 +1,5 @@
 from .pose_motion_model import (
+    KeypointRefineNet,
     PoseLifter,
     MotionGenerator,
     Pose2MotNet
@@ -9,10 +10,6 @@ from .refinement_model import (
     ResTrajRefinementModule,
     ResConvTrajRefinementModule,
     EnsTrajRefinementModule
-)
-
-from .keypoint_refinement import (
-    KeypointRefineNet
 )
 
 REFINEMENT_ARCHS = {

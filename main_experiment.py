@@ -1,4 +1,5 @@
 import os
+import pickle
 from pathlib import Path
 from datetime import date
 
@@ -7,13 +8,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from core.log import Logger, save_fig, save_config
-from core.dataset.generators2 import PoseGenerator
+from core.dataset.generators import PoseGenerator
 from core.models import (
     PoseLifter, MotionGenerator,
     Pose2MotNet, REFINEMENT_ARCHS
 )
 from core.utils import save_ckpt, load_ckpt
-from core.dataset.data_utils2 import fetch, read_3d_data, create_2d_data
+from core.dataset.data_utils import fetch, read_3d_data, create_2d_data
 
 from pose2motion_arguments import parse_args
 from pose2motion_utils import train, evaluate
@@ -23,19 +24,12 @@ def main(config):
     device = config.device
     print('==> Using settings {}'.format(config))
 
-    # workaround for motion evaluation calculation
-    # window_stride = config.future - config.past
-    # assert config.past <= config.future, \
-    #     'The current evaluation scheme for motion prediction requires config.past <= config.future'
-    evaluate_motion = config.final and config.past != config.future
-
-    if evaluate_motion:
-        print('==> Evaluate motion!')
     exp_name = f'{config.dataset}-{config.keypoint_source}-p{config.past}-f{config.future}-' \
-               f'h{config.hid_dim}-ponly_{config.train_motion_model}-rfv_{config.refine_version}-' \
-               f'lie_{config.use_lie_algebra}-liew_{config.lie_weight}-{date.today().strftime("%b-%d-%Y")}'
-    # if config.exp_prefix:
-    #     exp_name = config.exp_prefix + exp_name
+               f'h{config.hid_dim}-wMotion_{config.train_motion_model}-rfv_{config.refine_version}-' \
+               f'lie_{config.use_lie_algebra}-liew_{config.lie_weight}'
+
+    exp_name = exp_name + (config.exp_postfix if config.exp_postfix else date.today().strftime("%b-%d-%Y"))
+
     ckpt_dir_path = Path('experiments', exp_name)
     print('==> Created checkpoint dir: {}'.format(ckpt_dir_path))
     if ckpt_dir_path.exists():
@@ -55,6 +49,11 @@ def main(config):
         dataset = Human36mDataset(dataset_path)
         subjects_train = TRAIN_SUBJECTS
         subjects_test = TEST_SUBJECTS
+    elif config.dataset == 'humanevaI':
+        DATASET_NAME = config.dataset.lower()
+        dataset_path = Path('data', DATASET_NAME, f'data_3d_{DATASET_NAME}.npz')
+
+        raise NotImplementedError('Haven\'t done HumanEva-I!')
     else:
         raise KeyError('Invalid dataset')
 
@@ -69,33 +68,46 @@ def main(config):
     # They are stored in the format keypoints[subject][action][cam_idx]
     # Normalize so that [0, w] is mapped to [-1, 1], while preserving the aspect ratio
     # results in screen (aka frame) coordinates
-    print('==> Loading 2D detections...', end='\t')
+    print('==> Loading 2D detections...')
     keypoints_path = Path('data', DATASET_NAME, f'data_2d_{DATASET_NAME}_{config.keypoint_source}.npz')
-    keypoints = create_2d_data(keypoints_path, dataset)
-    print(keypoints.keys())
+    keypoints_dt = create_2d_data(keypoints_path, dataset)
+
+    keypoints_path = Path('data', DATASET_NAME, f'data_2d_{DATASET_NAME}_gt.npz')
+    keypoints_gt = create_2d_data(keypoints_path, dataset)
+
+    print('==> Loading Lie Algebra dataset...')
+    try:
+        lie_dataset_train = pickle.load(open(Path('data/', DATASET_NAME, 'train_data_lie.pkl'), 'rb'))
+        lie_dataset_test = pickle.load(open(Path('data/', DATASET_NAME, 'valid_data_lie.pkl'), 'rb'))
+        print(f'==> Found existing Lie repr at {Path("data/", DATASET_NAME)}')
+    except:
+        print('==> No existing Lie Algebra dataset, will create it now and save it.')
 
     print('==> Initializing dataloaders...')
     action_filter = None if config.actions == '*' else config.actions.split(',')
-    # pose_2d_past_segments, pose_3d_past_segments, pose_3d_future_segments, pose_actions = dataset
-    data = fetch(subjects_train, dataset, keypoints,
+    # action_filter = 'Walking 1'
+    # pose_2d_past_segments, pose_2d_past_gt_segments,
+    # pose_3d_past_segments, pose_3d_future_segments,
+    # pose_lie_segments, pose_lie_future_segments, pose_actions
+    data = fetch(subjects_train, dataset, keypoints_gt, keypoints_dt, lie_dataset=lie_dataset_train,
                  past=config.past, future=config.future, action_filter=action_filter,
                  window_stride=config.window_stride, time_stride=config.time_stride, train=True)
     train_loader = DataLoader(PoseGenerator(*data),
                               batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
     # pose evaluation
-    data = fetch(subjects_test, dataset, keypoints,
+    data = fetch(subjects_test, dataset, keypoints_gt, keypoints_dt, lie_dataset=lie_dataset_test,
                  past=config.past, future=config.future, action_filter=action_filter,
                  window_stride=config.past, time_stride=config.time_stride, train=False)
     valid_loader_pose = DataLoader(PoseGenerator(*data),
-                                   batch_size=config.batch_size * 4, shuffle=False, num_workers=config.num_workers)
+                                   batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    if evaluate_motion:
-        data = fetch(subjects_test, dataset, keypoints,
-                     past=config.past, future=config.future, action_filter=action_filter,
-                     window_stride=config.future, time_stride=config.time_stride, train=False)
-        valid_loader_motion = DataLoader(PoseGenerator(*data),
-                                         batch_size=config.batch_size * 4,
-                                         shuffle=False, num_workers=config.num_workers)
+    # if evaluate_motion:
+    #     data = fetch(subjects_test, dataset, keypoints,
+    #                  past=config.past, future=config.future, action_filter=action_filter,
+    #                  window_stride=config.future, time_stride=config.time_stride, train=False)
+    #     valid_loader_motion = DataLoader(PoseGenerator(*data),
+    #                                      batch_size=config.batch_size * 4,
+    #                                      shuffle=False, num_workers=config.num_workers)
     print('Done!')
 
     # save experiment config

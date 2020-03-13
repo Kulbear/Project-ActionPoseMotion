@@ -245,9 +245,14 @@ def train_motion_generator(train_data_loader, valid_data_loader,
             hidden = prediction['decoder_hidden']
 
             # no teacher forcing, only use ground truth
-            output = motion_3d_gt[:, t, :].unsqueeze(1)
+            # output = motion_3d_gt[:, t, :].unsqueeze(1)
+            # if use_lie_algebra:
+            #     output_lie = motion_lie_gt[:, t, :].unsqueeze(1)
+            #     output = (output, output_lie)
+
+            output = outputs[:, t, :].unsqueeze(1)
             if use_lie_algebra:
-                output_lie = motion_lie_gt[:, t, :].unsqueeze(1)
+                output_lie = outputs_lie[:, t, :].unsqueeze(1)
                 output = (output, output_lie)
 
         loss = loss_function(outputs.view(batch * future_seq_len, opt_dim),
